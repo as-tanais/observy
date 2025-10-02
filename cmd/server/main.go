@@ -25,7 +25,7 @@ func run() error {
 	mux.HandleFunc("/update/", metricshandler.UpdateMetricHandler)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
+		http.NotFound(w, r)
 	})
 
 	return http.ListenAndServe(`:8080`, mux)
