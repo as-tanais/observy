@@ -17,16 +17,14 @@ func NewMetricsHandler(service *service.MetricsService) *MetricsHandler {
 }
 
 func (h *MetricsHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Request) {
-	method := r.Method
-
-	if method != http.MethodPost {
-		http.Error(w, "", http.StatusMethodNotAllowed)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) != 5 {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
+		http.Error(w, "Invalid path", http.StatusNotFound)
 		return
 	}
 
