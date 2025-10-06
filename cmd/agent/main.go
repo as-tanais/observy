@@ -4,17 +4,28 @@ import (
 	"time"
 
 	"github.com/as-tanais/observy/internal/agent"
+	models "github.com/as-tanais/observy/internal/model"
 )
 
-const pollInterval = time.Second * 2
-const reportInterval = time.Second * 10
-
-var gaugeNames = []string{"Alloc", "BuckHashSys"}
-var counterNames = []string{"Alloc", "BuckHashSys"}
-
 func main() {
+	pollInterval := 2 * time.Second
+	reportInterval := 10 * time.Second
 
-	m := agent.Collect()
+	pollsPerReport := int(reportInterval / pollInterval)
 
-	agent.Send(m)
+	for {
+		var metrics []models.Metrics
+
+		for i := 0; i < pollsPerReport; i++ {
+			metrics = agent.Collect()
+
+			if i < pollsPerReport-1 {
+				time.Sleep(pollInterval)
+			}
+		}
+		agent.Send(metrics)
+
+		time.Sleep(pollInterval)
+
+	}
 }
