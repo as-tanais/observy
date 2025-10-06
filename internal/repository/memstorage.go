@@ -6,12 +6,7 @@ type MemStorage struct {
 	metrics map[string]models.Metrics
 }
 
-type Storage interface {
-	SetMetric(models.Metrics) error
-	GetMetric(string) (models.Metrics, bool)
-}
-
-func NewStorage() *MemStorage {
+func NewMemStorage() Storage {
 	return &MemStorage{
 		metrics: make(map[string]models.Metrics),
 	}
