@@ -1,7 +1,7 @@
 package service
 
 import (
-	"errors"
+	"fmt"
 	"strconv"
 
 	models "github.com/as-tanais/observy/internal/model"
@@ -19,34 +19,63 @@ func NewMetricsService(storage repository.Storage) *MetricsService {
 }
 
 func (s *MetricsService) SetMetric(metricType, metricName, valueStr string) error {
-	var metric models.Metrics
-	metric.ID = metricName
-	metric.MType = metricType
+	if metricName == "" {
+		return fmt.Errorf("metric name cannot be empty")
+	}
 
-	existingMetric, exists := s.storage.GetMetric(metricName)
+	metric := models.Metrics{
+		ID:    metricName,
+		MType: metricType,
+	}
 
 	switch metricType {
 	case models.Counter:
-		v, err := strconv.ParseInt(valueStr, 10, 64)
-		if err != nil {
-			return errors.New("invalid counter value")
-		}
-		var newDelta int64
-		if exists && existingMetric.Delta != nil {
-			newDelta = *existingMetric.Delta + v
-		} else {
-			newDelta = v
-		}
-		metric.Delta = &newDelta
+		return s.setCounterMetric(&metric, valueStr)
 	case models.Gauge:
-		v, err := strconv.ParseFloat(valueStr, 64)
-		if err != nil {
-			return errors.New("invalid gauge value")
-		}
-		metric.Value = &v
+		return s.setGaugeMetric(&metric, valueStr)
 	default:
-		return errors.New("unknown metric type")
+		return fmt.Errorf("unknown metric type: %s", metricType)
+	}
+}
+
+func (s *MetricsService) GetMetric(metricName string) (models.Metrics, error) {
+	if metricName == "" {
+		return models.Metrics{}, fmt.Errorf("metric name cannot be empty")
 	}
 
-	return s.storage.SetMetric(metric)
+	metric, exists := s.storage.GetMetric(metricName)
+	if !exists {
+		return models.Metrics{}, fmt.Errorf("metric '%s' not found", metricName)
+	}
+
+	return metric, nil
+}
+
+func (s *MetricsService) setCounterMetric(metric *models.Metrics, valueStr string) error {
+	v, err := strconv.ParseInt(valueStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid counter value '%s': %w", valueStr, err)
+	}
+
+	existingMetric, exists := s.storage.GetMetric(metric.ID)
+
+	var newDelta int64
+	if exists && existingMetric.Delta != nil {
+		newDelta = *existingMetric.Delta + v
+	} else {
+		newDelta = v
+	}
+
+	metric.Delta = &newDelta
+	return s.storage.SetMetric(*metric)
+}
+
+func (s *MetricsService) setGaugeMetric(metric *models.Metrics, valueStr string) error {
+	v, err := strconv.ParseFloat(valueStr, 64)
+	if err != nil {
+		return fmt.Errorf("invalid gauge value '%s': %w", valueStr, err)
+	}
+
+	metric.Value = &v
+	return s.storage.SetMetric(*metric)
 }

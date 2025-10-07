@@ -16,17 +16,18 @@ func main() {
 
 func run() error {
 
-	storage := repository.NewStorage()
+	storage := repository.NewMemStorage()
 	service := service.NewMetricsService(storage)
 	metricshandler := handler.NewMetricsHandler(service)
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/update/", metricshandler.UpdateMetricHandler)
+	mux.HandleFunc("/value/", metricshandler.GetMetricHandler)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	})
-	//Test
+
 	return http.ListenAndServe(`:8080`, mux)
 }
