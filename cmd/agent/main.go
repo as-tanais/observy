@@ -12,17 +12,19 @@ import (
 func main() {
 
 	serverAddr := flag.String("a", "localhost:8080", "Server address host:port, default: localhost:8080")
-	pollInterval := flag.Duration("p", 2, "Poll interval, default: 2s")
-	reportInterval := flag.Duration("r", 10, "Report interval, default: 10s")
+	pollIntervalSec := flag.Int("p", 2, "Poll interval, default: 2s")
+	reportIntervalSec := flag.Int("r", 10, "Report interval, default: 10s")
 
 	flag.Parse()
 
 	serverURL := "http://" + *serverAddr
+	pollInterval := time.Duration(*pollIntervalSec) * time.Second
+	reportInterval := time.Duration(*reportIntervalSec) * time.Second
 
-	pollsPerReport := int(*reportInterval / *pollInterval)
+	pollsPerReport := *pollIntervalSec / *reportIntervalSec
 
 	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v",
-		serverURL, *pollInterval, *reportInterval)
+		serverURL, pollInterval, reportInterval)
 
 	for {
 		var metrics []models.Metrics
@@ -31,12 +33,12 @@ func main() {
 			metrics = agent.Collect()
 
 			if i < pollsPerReport-1 {
-				time.Sleep(*pollInterval)
+				time.Sleep(pollInterval)
 			}
 		}
 		agent.Send(metrics, serverURL)
 
-		time.Sleep(*pollInterval)
+		time.Sleep(pollInterval)
 
 	}
 }
