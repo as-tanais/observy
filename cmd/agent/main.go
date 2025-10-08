@@ -21,7 +21,7 @@ func main() {
 	pollInterval := time.Duration(*pollIntervalSec) * time.Second
 	reportInterval := time.Duration(*reportIntervalSec) * time.Second
 
-	pollsPerReport := *pollIntervalSec / *reportIntervalSec
+	pollsPerReport := *reportIntervalSec / *pollIntervalSec
 
 	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v",
 		serverURL, pollInterval, reportInterval)
