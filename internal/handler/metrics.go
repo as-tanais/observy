@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
+
+	"github.com/go-chi/chi/v5"
 
 	model "github.com/as-tanais/observy/internal/model"
 	"github.com/as-tanais/observy/internal/service"
@@ -24,16 +25,9 @@ func (h *MetricsHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-
-	if len(parts) != 4 || parts[0] != "update" {
-		http.Error(w, "Invalid path format. Expected: /update/{type}/{name}/{value}", http.StatusNotFound)
-		return
-	}
-
-	metricType := parts[1]
-	metricName := parts[2]
-	metricValue := parts[3]
+	metricType := chi.URLParam(r, "type")
+	metricName := chi.URLParam(r, "name")
+	metricValue := chi.URLParam(r, "value")
 
 	if metricType == "" || metricName == "" || metricValue == "" {
 		http.Error(w, "Metric type, name and value cannot be empty", http.StatusBadRequest)
@@ -61,15 +55,8 @@ func (h *MetricsHandler) GetMetricHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-
-	if len(parts) != 3 || parts[0] != "value" {
-		http.Error(w, "Invalid path format. Expected: /value/{type}/{name}", http.StatusNotFound)
-		return
-	}
-
-	metricType := parts[1]
-	metricName := parts[2]
+	metricType := chi.URLParam(r, "type")
+	metricName := chi.URLParam(r, "name")
 
 	if metricType == "" || metricName == "" {
 		http.Error(w, "Metric type and name cannot be empty", http.StatusBadRequest)

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
 	"github.com/as-tanais/observy/internal/service"
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
@@ -20,14 +22,12 @@ func run() error {
 	service := service.NewMetricsService(storage)
 	metricshandler := handler.NewMetricsHandler(service)
 
-	mux := http.NewServeMux()
+	router := chi.NewRouter()
 
-	mux.HandleFunc("/update/", metricshandler.UpdateMetricHandler)
-	mux.HandleFunc("/value/", metricshandler.GetMetricHandler)
+	router.Post("/update/{type}/{name}/{value}", metricshandler.UpdateMetricHandler)
+	router.Get("/value/{type}/{name}", metricshandler.GetMetricHandler)
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.NotFound(w, r)
-	})
+	fmt.Println("Starting server on :8080")
 
-	return http.ListenAndServe(`:8080`, mux)
+	return http.ListenAndServe(`:8080`, router)
 }
