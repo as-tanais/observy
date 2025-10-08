@@ -8,9 +8,7 @@ import (
 	models "github.com/as-tanais/observy/internal/model"
 )
 
-var serverAddress = "http://localhost:8080"
-
-func Send(metrics []models.Metrics) {
+func Send(metrics []models.Metrics, serverAddress string) {
 	client := &http.Client{}
 
 	for _, metric := range metrics {
