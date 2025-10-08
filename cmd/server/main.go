@@ -26,6 +26,7 @@ func run() error {
 
 	router.Post("/update/{type}/{name}/{value}", metricshandler.UpdateMetricHandler)
 	router.Get("/value/{type}/{name}", metricshandler.GetMetricHandler)
+	router.Get("/", metricshandler.ListMetricsHandler)
 
 	fmt.Println("Starting server on :8080")
 

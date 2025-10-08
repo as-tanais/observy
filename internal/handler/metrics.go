@@ -100,3 +100,83 @@ func (h *MetricsHandler) GetMetricHandler(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(value))
 }
+
+func (h *MetricsHandler) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
+
+	metrics := h.service.GetAllMetrics()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+	html := `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metrics</title>
+</head>
+<body>
+    <h1>Metrics</h1>
+    <p>Total metrics: <strong>` + fmt.Sprintf("%d", len(metrics)) + `</strong></p>
+`
+
+	if len(metrics) == 0 {
+		html += `<div class="empty">Метрики еще не подгружались</div>`
+	} else {
+		html += `
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+`
+		for _, metric := range metrics {
+			var value string
+			var typeClass string
+
+			switch metric.MType {
+			case model.Gauge:
+				typeClass = "gauge"
+				if metric.Value != nil {
+					value = fmt.Sprintf("%.2f", *metric.Value)
+				} else {
+					value = "N/A"
+				}
+			case model.Counter:
+				typeClass = "counter"
+				if metric.Delta != nil {
+					value = fmt.Sprintf("%d", *metric.Delta)
+				} else {
+					value = "N/A"
+				}
+			default:
+				typeClass = ""
+				value = "Unknown"
+			}
+
+			html += fmt.Sprintf(`
+            <tr>
+                <td><strong>%s</strong></td>
+                <td><span class="%s">%s</span></td>
+                <td><span class="value">%s</span></td>
+            </tr>
+`, metric.ID, typeClass, metric.MType, value)
+		}
+
+		html += `
+        </tbody>
+    </table>
+`
+	}
+
+	html += `
+</body>
+</html>
+`
+
+	w.Write([]byte(html))
+}
