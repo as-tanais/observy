@@ -79,3 +79,7 @@ func (s *MetricsService) setGaugeMetric(metric *models.Metrics, valueStr string)
 	metric.Value = &v
 	return s.storage.SetMetric(*metric)
 }
+
+func (s *MetricsService) GetAllMetrics() []models.Metrics {
+	return s.storage.GetAllMetrics()
+}

@@ -5,13 +5,22 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/as-tanais/observy/internal/handler"
 	model "github.com/as-tanais/observy/internal/model"
 	"github.com/as-tanais/observy/internal/repository"
 	"github.com/as-tanais/observy/internal/service"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
+
+func setupRouter(h *handler.MetricsHandler) *chi.Mux {
+	r := chi.NewRouter()
+	r.Post("/update/{type}/{name}/{value}", h.UpdateMetricHandler)
+	r.Get("/value/{type}/{name}", h.GetMetricHandler)
+	return r
+}
 
 func TestMetricsHandler_UpdateMetricHandler(t *testing.T) {
 	tests := []struct {
@@ -40,21 +49,14 @@ func TestMetricsHandler_UpdateMetricHandler(t *testing.T) {
 			method:         http.MethodGet,
 			path:           "/update/gauge/Alloc/123.45",
 			wantStatusCode: http.StatusMethodNotAllowed,
-			wantBody:       "Method Not Allowed",
+			wantBody:       "",
 		},
 		{
 			name:           "неправильный формат пути (не хватает значения)",
 			method:         http.MethodPost,
 			path:           "/update/gauge/Alloc",
 			wantStatusCode: http.StatusNotFound,
-			wantBody:       "Invalid path format",
-		},
-		{
-			name:           "неправильный формат пути (слишком много параметров)",
-			method:         http.MethodPost,
-			path:           "/update/gauge/Alloc/123/extra",
-			wantStatusCode: http.StatusNotFound,
-			wantBody:       "Invalid path format",
+			wantBody:       "",
 		},
 		{
 			name:           "неправильный тип метрики",
@@ -93,10 +95,12 @@ func TestMetricsHandler_UpdateMetricHandler(t *testing.T) {
 			svc := service.NewMetricsService(storage)
 			h := handler.NewMetricsHandler(svc)
 
+			router := setupRouter(h)
+
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			w := httptest.NewRecorder()
 
-			h.UpdateMetricHandler(w, req)
+			router.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.wantStatusCode, w.Code, "Неправильный статус код")
 
@@ -160,7 +164,7 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 			method:         http.MethodPost,
 			path:           "/value/gauge/Alloc",
 			wantStatusCode: http.StatusMethodNotAllowed,
-			wantBody:       "Method Not Allowed",
+			wantBody:       "",
 		},
 		{
 			name:           "неправильный формат пути",
@@ -168,7 +172,7 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 			method:         http.MethodGet,
 			path:           "/value/gauge",
 			wantStatusCode: http.StatusNotFound,
-			wantBody:       "Invalid path format",
+			wantBody:       "",
 		},
 	}
 
@@ -190,10 +194,12 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 				require.NoError(t, err, "Ошибка при предзагрузке метрики")
 			}
 
+			router := setupRouter(h)
+
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			w := httptest.NewRecorder()
 
-			h.GetMetricHandler(w, req)
+			router.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.wantStatusCode, w.Code, "Неправильный статус код")
 
@@ -208,15 +214,16 @@ func TestMetricsHandler_UpdateAndGet(t *testing.T) {
 	storage := repository.NewMemStorage()
 	svc := service.NewMetricsService(storage)
 	h := handler.NewMetricsHandler(svc)
+	router := setupRouter(h)
 
 	reqUpdate := httptest.NewRequest(http.MethodPost, "/update/gauge/Alloc/999.99", nil)
 	wUpdate := httptest.NewRecorder()
-	h.UpdateMetricHandler(wUpdate, reqUpdate)
+	router.ServeHTTP(wUpdate, reqUpdate)
 	assert.Equal(t, http.StatusOK, wUpdate.Code)
 
 	reqGet := httptest.NewRequest(http.MethodGet, "/value/gauge/Alloc", nil)
 	wGet := httptest.NewRecorder()
-	h.GetMetricHandler(wGet, reqGet)
+	router.ServeHTTP(wGet, reqGet)
 	assert.Equal(t, http.StatusOK, wGet.Code)
 	assert.Equal(t, "999.99", wGet.Body.String())
 }
@@ -225,18 +232,19 @@ func TestMetricsHandler_CounterAccumulation(t *testing.T) {
 	storage := repository.NewMemStorage()
 	svc := service.NewMetricsService(storage)
 	h := handler.NewMetricsHandler(svc)
+	router := setupRouter(h)
 
 	values := []string{"5", "3", "2"}
 	for _, val := range values {
 		req := httptest.NewRequest(http.MethodPost, "/update/counter/PollCount/"+val, nil)
 		w := httptest.NewRecorder()
-		h.UpdateMetricHandler(w, req)
+		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 	}
 
 	reqGet := httptest.NewRequest(http.MethodGet, "/value/counter/PollCount", nil)
 	wGet := httptest.NewRecorder()
-	h.GetMetricHandler(wGet, reqGet)
+	router.ServeHTTP(wGet, reqGet)
 	assert.Equal(t, http.StatusOK, wGet.Code)
 	assert.Equal(t, "10", wGet.Body.String())
 }

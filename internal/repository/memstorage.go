@@ -1,6 +1,8 @@
 package repository
 
-import models "github.com/as-tanais/observy/internal/model"
+import (
+	models "github.com/as-tanais/observy/internal/model"
+)
 
 type MemStorage struct {
 	metrics map[string]models.Metrics
@@ -26,4 +28,14 @@ func (s *MemStorage) SetMetric(m models.Metrics) error {
 func (s *MemStorage) GetMetric(id string) (models.Metrics, bool) {
 	m, ok := s.metrics[id]
 	return m, ok
+}
+
+func (s *MemStorage) GetAllMetrics() []models.Metrics {
+	metrics := make([]models.Metrics, 0, len(s.metrics))
+
+	for _, metric := range s.metrics {
+		metrics = append(metrics, metric)
+	}
+
+	return metrics
 }
