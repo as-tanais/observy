@@ -12,8 +12,8 @@ import (
 func main() {
 
 	serverAddr := flag.String("a", "localhost:8080", "Server address host:port, default: localhost:8080")
-	pollInterval := flag.Duration("p", 2*time.Second, "Poll interval, default: 2s")
-	reportInterval := flag.Duration("r", 10*time.Second, "Report interval, default: 10s")
+	pollInterval := flag.Duration("p", 2, "Poll interval, default: 2s")
+	reportInterval := flag.Duration("r", 10, "Report interval, default: 10s")
 
 	flag.Parse()
 
