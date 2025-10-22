@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 
@@ -18,6 +19,9 @@ func main() {
 
 func run() error {
 
+	serverAddr := flag.String("a", "localhost:8080", "Server address (host:port)")
+	flag.Parse()
+
 	storage := repository.NewMemStorage()
 	service := service.NewMetricsService(storage)
 	metricshandler := handler.NewMetricsHandler(service)
@@ -28,7 +32,7 @@ func run() error {
 	router.Get("/value/{type}/{name}", metricshandler.GetMetricHandler)
 	router.Get("/", metricshandler.ListMetricsHandler)
 
-	fmt.Println("Starting server on :8080")
+	fmt.Printf("Starting server on %s", *serverAddr)
 
-	return http.ListenAndServe(`:8080`, router)
+	return http.ListenAndServe(*serverAddr, router)
 }

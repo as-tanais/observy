@@ -59,16 +59,12 @@ func TestSend_URLFormat(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalAddress := serverAddress
-	serverAddress = server.URL
-	defer func() { serverAddress = originalAddress }()
-
 	value := 123.45
 	testMetrics := []models.Metrics{
 		{ID: "TestGauge", MType: models.Gauge, Value: &value},
 	}
 
-	Send(testMetrics)
+	Send(testMetrics, server.URL)
 
 	expectedPath := "/update/gauge/TestGauge/123.450000"
 	assert.Equal(t, expectedPath, capturedPath, "URL должен соответствовать формату /update/{type}/{name}/{value}")
@@ -87,16 +83,12 @@ func TestSend_CounterMetric(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalAddress := serverAddress
-	serverAddress = server.URL
-	defer func() { serverAddress = originalAddress }()
-
 	delta := int64(42)
 	testMetrics := []models.Metrics{
 		{ID: "PollCount", MType: models.Counter, Delta: &delta},
 	}
 
-	Send(testMetrics)
+	Send(testMetrics, server.URL)
 
 	expectedPath := "/update/counter/PollCount/42"
 	assert.Equal(t, expectedPath, capturedPath, "Путь должен содержать counter тип и целое значение")
@@ -117,10 +109,6 @@ func TestSend_MultipleMetrics(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalAddress := serverAddress
-	serverAddress = server.URL
-	defer func() { serverAddress = originalAddress }()
-
 	gaugeValue := 100.5
 	counterDelta := int64(5)
 
@@ -130,7 +118,7 @@ func TestSend_MultipleMetrics(t *testing.T) {
 		{ID: "Sys", MType: models.Gauge, Value: &gaugeValue},
 	}
 
-	Send(testMetrics)
+	Send(testMetrics, server.URL)
 
 	assert.Equal(t, 3, requestCount, "Должно быть отправлено 3 запроса")
 
