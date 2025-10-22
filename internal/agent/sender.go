@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	models "github.com/as-tanais/observy/internal/model"
 )
 
+var httpClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
+
 func Send(metrics []models.Metrics, serverAddress string) {
-	client := &http.Client{}
 
 	for _, metric := range metrics {
 		var value string
@@ -20,18 +24,18 @@ func Send(metrics []models.Metrics, serverAddress string) {
 			if metric.Value != nil {
 				value = fmt.Sprintf("%f", *metric.Value)
 			} else {
-				log.Printf("Пропущена gauge метрика %s: значение nil", metric.ID)
+				log.Printf("Пропущена gauge метрика %s: значение nil\n", metric.ID)
 				continue
 			}
 		case models.Counter:
 			if metric.Delta != nil {
 				value = fmt.Sprintf("%d", *metric.Delta)
 			} else {
-				log.Printf("Пропущена counter метрика %s: значение nil", metric.ID)
+				log.Printf("Пропущена counter метрика %s: значение nil\n", metric.ID)
 				continue
 			}
 		default:
-			log.Printf("Неизвестный тип метрики: %s", metric.MType)
+			log.Printf("Неизвестный тип метрики: %s\n", metric.MType)
 			continue
 		}
 
@@ -41,7 +45,7 @@ func Send(metrics []models.Metrics, serverAddress string) {
 		// Создаём запрос
 		req, err := http.NewRequest(http.MethodPost, url, nil)
 		if err != nil {
-			log.Printf("Ошибка создания запроса для %s: %v", metric.ID, err)
+			log.Printf("Ошибка создания запроса для %s: %v\n", metric.ID, err)
 			continue
 		}
 
@@ -49,9 +53,9 @@ func Send(metrics []models.Metrics, serverAddress string) {
 		req.Header.Set("Content-Type", "text/plain")
 
 		// Отправляем запрос
-		resp, err := client.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
-			log.Printf("Ошибка отправки метрики %s: %v", metric.ID, err)
+			log.Printf("Ошибка отправки метрики %s: %v\n", metric.ID, err)
 			continue
 		}
 
@@ -60,7 +64,7 @@ func Send(metrics []models.Metrics, serverAddress string) {
 
 		// Проверяем статус ответа
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("Метрика %s: неожиданный статус %d", metric.ID, resp.StatusCode)
+			log.Printf("Метрика %s: неожиданный статус %d\ns", metric.ID, resp.StatusCode)
 		}
 	}
 }
