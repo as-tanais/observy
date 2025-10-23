@@ -1,44 +1,37 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/as-tanais/observy/internal/agent"
+	"github.com/as-tanais/observy/internal/config"
 	models "github.com/as-tanais/observy/internal/model"
 )
 
 func main() {
+	cfg, err := config.NewAgentConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 
-	serverAddr := flag.String("a", "localhost:8080", "Server address host:port, default: localhost:8080")
-	pollIntervalSec := flag.Int("p", 2, "Poll interval, default: 2s")
-	reportIntervalSec := flag.Int("r", 10, "Report interval, default: 10s")
-
-	flag.Parse()
-
-	serverURL := "http://" + *serverAddr
-	pollInterval := time.Duration(*pollIntervalSec) * time.Second
-	reportInterval := time.Duration(*reportIntervalSec) * time.Second
-
-	pollsPerReport := *reportIntervalSec / *pollIntervalSec
-
-	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v",
-		serverURL, pollInterval, reportInterval)
+	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v\n",
+		cfg.ServerURL(), cfg.PollInterval, cfg.ReportInterval)
 
 	for {
 		var metrics []models.Metrics
 
-		for i := 0; i < pollsPerReport; i++ {
+		for i := 0; i < cfg.PollsPerReport(); i++ {
 			metrics = agent.Collect()
 
-			if i < pollsPerReport-1 {
-				time.Sleep(pollInterval)
+			if i < cfg.PollsPerReport()-1 {
+				time.Sleep(cfg.PollInterval)
 			}
 		}
-		agent.Send(metrics, serverURL)
 
-		time.Sleep(pollInterval)
+		agent.Send(metrics, cfg.ServerURL())
 
+		time.Sleep(cfg.PollInterval)
 	}
 }
