@@ -1,12 +1,11 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
+	"github.com/as-tanais/observy/internal/config"
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
 	"github.com/as-tanais/observy/internal/service"
@@ -20,13 +19,9 @@ func main() {
 }
 
 func run() error {
-	serverAddr := flag.String("a", "localhost:8080", "Server address (host:port)")
-
-	flag.Parse()
-
-	addr := os.Getenv("ADDRESS")
-	if addr == "" {
-		addr = *serverAddr
+	cfg, err := config.NewServerConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
 	storage := repository.NewMemStorage()
@@ -39,9 +34,12 @@ func run() error {
 	router.Get("/", metricshandler.ListMetricsHandler)
 
 	server := &http.Server{
-		Addr:    addr,
+		Addr:    cfg.Address,
 		Handler: router,
 	}
+
+	fmt.Printf("Starting server on %s\n", cfg.Address)
+	log.Printf("Listening on: %s", cfg.Address)
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server failed: %w", err)

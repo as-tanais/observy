@@ -2,65 +2,66 @@ package agent
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"time"
 
 	models "github.com/as-tanais/observy/internal/model"
 )
 
+var client = &http.Client{
+	Timeout: 10 * time.Second,
+}
+
 func Send(metrics []models.Metrics, serverAddress string) {
-	client := &http.Client{}
-
 	for _, metric := range metrics {
-		var value string
-
-		// Определяем значение в зависимости от типа метрики
-		switch metric.MType {
-		case models.Gauge:
-			if metric.Value != nil {
-				value = fmt.Sprintf("%f", *metric.Value)
-			} else {
-				log.Printf("Пропущена gauge метрика %s: значение nil", metric.ID)
-				continue
-			}
-		case models.Counter:
-			if metric.Delta != nil {
-				value = fmt.Sprintf("%d", *metric.Delta)
-			} else {
-				log.Printf("Пропущена counter метрика %s: значение nil", metric.ID)
-				continue
-			}
-		default:
-			log.Printf("Неизвестный тип метрики: %s", metric.MType)
-			continue
-		}
-
-		// Формируем URL
-		url := fmt.Sprintf("%s/update/%s/%s/%s", serverAddress, metric.MType, metric.ID, value)
-
-		// Создаём запрос
-		req, err := http.NewRequest(http.MethodPost, url, nil)
-		if err != nil {
-			log.Printf("Ошибка создания запроса для %s: %v", metric.ID, err)
-			continue
-		}
-
-		// Устанавливаем заголовок
-		req.Header.Set("Content-Type", "text/plain")
-
-		// Отправляем запрос
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("Ошибка отправки метрики %s: %v", metric.ID, err)
-			continue
-		}
-
-		// Закрываем тело ответа
-		resp.Body.Close()
-
-		// Проверяем статус ответа
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Метрика %s: неожиданный статус %d", metric.ID, resp.StatusCode)
+		if err := sendMetric(metric, serverAddress); err != nil {
+			log.Printf("sending error %s: %v", metric.ID, err)
 		}
 	}
+}
+
+func sendMetric(metric models.Metrics, serverAddress string) error {
+
+	var value string
+
+	switch metric.MType {
+	case models.Gauge:
+		if metric.Value == nil {
+			return fmt.Errorf("gauge metric %s: value nil", metric.ID)
+		}
+		value = fmt.Sprintf("%f", *metric.Value)
+	case models.Counter:
+		if metric.Delta == nil {
+			return fmt.Errorf("counter metric %s: value nil", metric.ID)
+		}
+		value = fmt.Sprintf("%d", *metric.Delta)
+	default:
+		return fmt.Errorf("unknown type of metric: %s", metric.MType)
+	}
+
+	url := fmt.Sprintf("%s/update/%s/%s/%s", serverAddress, metric.MType, metric.ID, value)
+
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("creating request error: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "text/plain")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("sending error: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unknown error %d", resp.StatusCode)
+	}
+
+	return nil
 }
