@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/as-tanais/observy/internal/agent"
@@ -10,20 +12,61 @@ import (
 )
 
 func main() {
+	// Значения по умолчанию
+	defaultServerAddr := "localhost:8080"
+	defaultPollIntervalSec := 2
+	defaultReportIntervalSec := 10
 
-	serverAddr := flag.String("a", "localhost:8080", "Server address host:port, default: localhost:8080")
-	pollIntervalSec := flag.Int("p", 2, "Poll interval, default: 2s")
-	reportIntervalSec := flag.Int("r", 10, "Report interval, default: 10s")
+	// Определяем ВСЕ флаги ПЕРЕД flag.Parse()
+	addrFlag := flag.String("a", defaultServerAddr, "Server address host:port")
+	pollFlag := flag.Int("p", defaultPollIntervalSec, "Poll interval in seconds")
+	reportFlag := flag.Int("r", defaultReportIntervalSec, "Report interval in seconds")
 
+	// Парсим флаги ОДИН РАЗ
 	flag.Parse()
 
-	serverURL := "http://" + *serverAddr
-	pollInterval := time.Duration(*pollIntervalSec) * time.Second
-	reportInterval := time.Duration(*reportIntervalSec) * time.Second
+	// Применяем приоритет: ENV > флаг > дефолт
+	serverAddr := *addrFlag
+	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
+		serverAddr = envAddr
+	}
 
-	pollsPerReport := *reportIntervalSec / *pollIntervalSec
+	pollIntervalSec := *pollFlag
+	if envPoll := os.Getenv("POLL_INTERVAL"); envPoll != "" {
+		if val, err := strconv.Atoi(envPoll); err == nil {
+			pollIntervalSec = val
+		} else {
+			fmt.Fprintf(os.Stderr, "Invalid POLL_INTERVAL: %v\n", err)
+			os.Exit(1)
+		}
+	}
 
-	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v",
+	reportIntervalSec := *reportFlag
+	if envReport := os.Getenv("REPORT_INTERVAL"); envReport != "" {
+		if val, err := strconv.Atoi(envReport); err == nil {
+			reportIntervalSec = val
+		} else {
+			fmt.Fprintf(os.Stderr, "Invalid REPORT_INTERVAL: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Валидация
+	if pollIntervalSec <= 0 || reportIntervalSec <= 0 {
+		fmt.Fprintln(os.Stderr, "Poll and report intervals must be positive integers")
+		os.Exit(1)
+	}
+
+	serverURL := "http://" + serverAddr
+	pollInterval := time.Duration(pollIntervalSec) * time.Second
+	reportInterval := time.Duration(reportIntervalSec) * time.Second
+
+	pollsPerReport := reportIntervalSec / pollIntervalSec
+	if pollsPerReport == 0 {
+		pollsPerReport = 1
+	}
+
+	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v\n",
 		serverURL, pollInterval, reportInterval)
 
 	for {
@@ -39,6 +82,5 @@ func main() {
 		agent.Send(metrics, serverURL)
 
 		time.Sleep(pollInterval)
-
 	}
 }
