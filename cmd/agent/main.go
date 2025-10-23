@@ -12,20 +12,17 @@ import (
 )
 
 func main() {
-	// Значения по умолчанию
+
 	defaultServerAddr := "localhost:8080"
 	defaultPollIntervalSec := 2
 	defaultReportIntervalSec := 10
 
-	// Определяем ВСЕ флаги ПЕРЕД flag.Parse()
 	addrFlag := flag.String("a", defaultServerAddr, "Server address host:port")
 	pollFlag := flag.Int("p", defaultPollIntervalSec, "Poll interval in seconds")
 	reportFlag := flag.Int("r", defaultReportIntervalSec, "Report interval in seconds")
 
-	// Парсим флаги ОДИН РАЗ
 	flag.Parse()
 
-	// Применяем приоритет: ENV > флаг > дефолт
 	serverAddr := *addrFlag
 	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
 		serverAddr = envAddr
