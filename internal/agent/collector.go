@@ -3,7 +3,6 @@ package agent
 import (
 	"math/rand"
 	"runtime"
-	"sync/atomic"
 
 	models "github.com/as-tanais/observy/internal/model"
 )
@@ -28,7 +27,7 @@ func Collect() []models.Metrics {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	newPollCount := atomic.AddInt64(&pollCount, 1)
+	delta := int64(1)
 
 	randomValue := rand.Float64()
 
@@ -63,7 +62,7 @@ func Collect() []models.Metrics {
 		models.Metrics{ID: "Sys", MType: models.Gauge, Value: toFloat64(memStats.Sys)},
 		models.Metrics{ID: "TotalAlloc", MType: models.Gauge, Value: toFloat64(memStats.TotalAlloc)},
 
-		models.Metrics{ID: "PollCount", MType: models.Counter, Delta: toInt64(newPollCount)},
+		models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &delta},
 		models.Metrics{ID: "RandomValue", MType: models.Gauge, Value: &randomValue},
 	)
 
