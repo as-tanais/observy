@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -99,6 +100,23 @@ func (h *MetricsHandler) GetMetricHandler(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(value))
+}
+
+func (h *MetricsHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
+	var newMetrics model.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&newMetrics); err != nil {
+		return
+	}
+
+	fmt.Println(newMetrics)
+	fmt.Println(newMetrics.Value)
+
+	err := h.service.SetNewMetric(newMetrics)
+	if err != nil {
+		return
+	}
+
 }
 
 func (h *MetricsHandler) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {

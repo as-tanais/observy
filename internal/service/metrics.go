@@ -83,3 +83,42 @@ func (s *MetricsService) setGaugeMetric(metric *models.Metrics, valueStr string)
 func (s *MetricsService) GetAllMetrics() []models.Metrics {
 	return s.storage.GetAllMetrics()
 }
+
+func (s *MetricsService) SetNewMetric(input models.Metrics) error {
+	if input.ID == "" {
+		return fmt.Errorf("metric name cannot be empty")
+	}
+
+	switch input.MType {
+	case "counter":
+
+		if input.Delta == nil {
+			return fmt.Errorf("delta value is required for counter metric")
+		}
+
+		existingMetric, exists := s.storage.GetMetric(input.ID)
+
+		var newDelta int64
+		if exists && existingMetric.Delta != nil {
+
+			newDelta = *existingMetric.Delta + *input.Delta
+		} else {
+
+			newDelta = *input.Delta
+		}
+
+		input.Delta = &newDelta
+		return s.storage.SetMetric(input)
+
+	case "gauge":
+
+		if input.Value == nil {
+			return fmt.Errorf("value is required for gauge metric")
+		}
+
+		return s.storage.SetMetric(input)
+
+	default:
+		return fmt.Errorf("unsupported metric type: %s", input.MType)
+	}
+}
