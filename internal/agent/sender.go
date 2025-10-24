@@ -69,11 +69,12 @@ func sendMetric(metric models.Metrics, serverAddress string) error {
 }
 
 func sendMetricJSON(metric models.Metrics, serverAddress string) error {
-
+	// Валидация метрики
 	if err := validateMetric(metric); err != nil {
 		return err
 	}
 
+	// Маршалим структуру в JSON
 	jsonData, err := json.Marshal(metric)
 	if err != nil {
 		return fmt.Errorf("json marshal error: %w", err)
@@ -81,27 +82,40 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 
 	url := fmt.Sprintf("%s/update", serverAddress)
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("creating request error: %w", err)
+	// Retry логика: 3 попытки с задержкой
+	maxRetries := 3
+	retryDelay := 100 * time.Millisecond
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return fmt.Errorf("creating request error: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			// Если это не последняя попытка, ждём и пробуем снова
+			if attempt < maxRetries-1 {
+				time.Sleep(retryDelay)
+				retryDelay *= 2 // Экспоненциальная задержка
+				continue
+			}
+			return fmt.Errorf("sending error after %d attempts: %w", maxRetries, err)
+		}
+
+		defer resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("server returned status %d", resp.StatusCode)
+		}
+
+		return nil // Успешно отправлено
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("sending error: %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	_, _ = io.Copy(io.Discard, resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-
-	return nil
+	return fmt.Errorf("failed after %d retries", maxRetries)
 }
 
 func validateMetric(metric models.Metrics) error {

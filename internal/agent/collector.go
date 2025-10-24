@@ -7,8 +7,6 @@ import (
 	models "github.com/as-tanais/observy/internal/model"
 )
 
-var pollCount int64
-
 func toFloat64(v uint64) *float64 {
 	f := float64(v)
 	return &f
@@ -17,10 +15,6 @@ func toFloat64(v uint64) *float64 {
 func toFloat64FromUint32(v uint32) *float64 {
 	f := float64(v)
 	return &f
-}
-
-func toInt64(v int64) *int64 {
-	return &v
 }
 
 func Collect() []models.Metrics {
