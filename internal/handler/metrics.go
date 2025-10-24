@@ -106,16 +106,43 @@ func (h *MetricsHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	var newMetrics model.Metrics
 
 	if err := json.NewDecoder(r.Body).Decode(&newMetrics); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
 		return
 	}
-
-	fmt.Println(newMetrics)
-	fmt.Println(newMetrics.Value)
 
 	err := h.service.SetNewMetric(newMetrics)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+
+}
+
+func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var metric model.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	output, err := h.service.GetMetric(metric.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(output)
 
 }
 
