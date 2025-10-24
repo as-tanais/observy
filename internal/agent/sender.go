@@ -80,7 +80,7 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 		return fmt.Errorf("json marshal error: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/update", serverAddress)
+	url := fmt.Sprintf("%s/update/", serverAddress)
 
 	// Retry логика: 3 попытки с задержкой
 	maxRetries := 3
