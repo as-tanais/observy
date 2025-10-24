@@ -122,11 +122,6 @@ func (h *MetricsHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	var metric model.Metrics
 
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
@@ -134,9 +129,21 @@ func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if metric.ID == "" {
+		http.Error(w, "metric name cannot be empty", http.StatusBadRequest)
+		return
+	}
+
 	output, err := h.service.GetMetric(metric.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		// Если метрика не найдена - возвращаем 404
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Опционально: проверяем соответствие типа, если он указан
+	if metric.MType != "" && output.MType != metric.MType {
+		http.Error(w, "metric type mismatch", http.StatusBadRequest)
 		return
 	}
 

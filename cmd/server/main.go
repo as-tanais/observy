@@ -42,8 +42,8 @@ func run() error {
 
 	router.Use(middleware.WithLogging(logger))
 
-	router.Post("/update", metricshandler.UpdateHandler)
-	router.Post("/value", metricshandler.GetMetric)
+	router.Post("/update/", metricshandler.UpdateHandler)
+	router.Post("/value/", metricshandler.GetMetric)
 
 	router.Post("/update/{type}/{name}/{value}", metricshandler.UpdateMetricHandler)
 	router.Get("/value/{type}/{name}", metricshandler.GetMetricHandler)
