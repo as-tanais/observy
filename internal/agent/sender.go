@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,7 +26,6 @@ func Send(metrics []models.Metrics, serverAddress string) {
 }
 
 func sendMetric(metric models.Metrics, serverAddress string) error {
-
 	var value string
 
 	switch metric.MType {
@@ -78,14 +78,33 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 		return fmt.Errorf("json marshal error: %w", err)
 	}
 
+	// Сжимаем JSON-данные с помощью gzip
+	var compressedBuffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressedBuffer)
+
+	if _, err := gzipWriter.Write(jsonData); err != nil {
+		return fmt.Errorf("gzip write error: %w", err)
+	}
+
+	// ВАЖНО: закрываем writer, иначе данные не будут полностью записаны
+	if err := gzipWriter.Close(); err != nil {
+		return fmt.Errorf("gzip close error: %w", err)
+	}
+
 	url := fmt.Sprintf("%s/update/", serverAddress)
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
+	// Создаём запрос со сжатыми данными
+	req, err := http.NewRequest(http.MethodPost, url, &compressedBuffer)
 	if err != nil {
 		return fmt.Errorf("creating request error: %w", err)
 	}
 
+	// Указываем, что тело запроса сжато с помощью gzip
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+
+	// Указываем, что агент поддерживает сжатые ответы
+	req.Header.Set("Accept-Encoding", "gzip")
 
 	resp, err := client.Do(req)
 	if err != nil {

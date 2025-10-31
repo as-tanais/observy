@@ -41,6 +41,8 @@ func run() error {
 	router := chi.NewRouter()
 
 	router.Use(middleware.WithLogging(logger))
+	router.Use(middleware.GzipDecompressRequest())
+	router.Use(middleware.GzipCompressResponse())
 
 	router.Post("/update/", metricshandler.UpdateHandler)
 	router.Post("/value/", metricshandler.GetMetric)
