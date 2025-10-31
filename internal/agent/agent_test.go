@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -52,15 +54,27 @@ func TestSend_JSONFormat(t *testing.T) {
 	var capturedPath string
 	var capturedMethod string
 	var capturedContentType string
+	var capturedContentEncoding string
 	var capturedBody models.Metrics
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedPath = r.URL.Path
 		capturedMethod = r.Method
 		capturedContentType = r.Header.Get("Content-Type")
+		capturedContentEncoding = r.Header.Get("Content-Encoding")
 
-		// Читаем JSON из тела запроса
+		// Читаем тело запроса
 		body, _ := io.ReadAll(r.Body)
+
+		// Если тело сжато - распаковываем
+		if capturedContentEncoding == "gzip" {
+			gr, err := gzip.NewReader(bytes.NewReader(body))
+			if err == nil {
+				defer gr.Close()
+				body, _ = io.ReadAll(gr)
+			}
+		}
+
 		json.Unmarshal(body, &capturedBody)
 
 		w.WriteHeader(http.StatusOK)
@@ -77,6 +91,7 @@ func TestSend_JSONFormat(t *testing.T) {
 	assert.Equal(t, "/update/", capturedPath, "URL должен быть /update/ (JSON API)")
 	assert.Equal(t, http.MethodPost, capturedMethod, "Метод должен быть POST")
 	assert.Equal(t, "application/json", capturedContentType, "Content-Type должен быть application/json")
+	assert.Equal(t, "gzip", capturedContentEncoding, "Content-Encoding должен быть gzip")
 
 	assert.Equal(t, "TestGauge", capturedBody.ID, "ID в JSON должен быть TestGauge")
 	assert.Equal(t, models.Gauge, capturedBody.MType, "Type в JSON должен быть gauge")
@@ -88,14 +103,26 @@ func TestSend_CounterMetric(t *testing.T) {
 	var capturedPath string
 	var capturedMethod string
 	var capturedContentType string
+	var capturedContentEncoding string
 	var capturedBody models.Metrics
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedPath = r.URL.Path
 		capturedMethod = r.Method
 		capturedContentType = r.Header.Get("Content-Type")
+		capturedContentEncoding = r.Header.Get("Content-Encoding")
 
 		body, _ := io.ReadAll(r.Body)
+
+		// Если тело сжато - распаковываем
+		if capturedContentEncoding == "gzip" {
+			gr, err := gzip.NewReader(bytes.NewReader(body))
+			if err == nil {
+				defer gr.Close()
+				body, _ = io.ReadAll(gr)
+			}
+		}
+
 		json.Unmarshal(body, &capturedBody)
 
 		w.WriteHeader(http.StatusOK)
@@ -112,6 +139,7 @@ func TestSend_CounterMetric(t *testing.T) {
 	assert.Equal(t, "/update/", capturedPath, "Путь должен быть /update/ (JSON API)")
 	assert.Equal(t, http.MethodPost, capturedMethod, "Метод должен быть POST")
 	assert.Equal(t, "application/json", capturedContentType, "Content-Type должен быть application/json")
+	assert.Equal(t, "gzip", capturedContentEncoding, "Content-Encoding должен быть gzip")
 
 	// Проверяем JSON содержимое
 	assert.Equal(t, "PollCount", capturedBody.ID, "ID в JSON должен быть PollCount")
@@ -127,8 +155,18 @@ func TestSend_MultipleMetrics(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
 
-		var metric models.Metrics
 		body, _ := io.ReadAll(r.Body)
+
+		// Если тело сжато - распаковываем
+		if r.Header.Get("Content-Encoding") == "gzip" {
+			gr, err := gzip.NewReader(bytes.NewReader(body))
+			if err == nil {
+				defer gr.Close()
+				body, _ = io.ReadAll(gr)
+			}
+		}
+
+		var metric models.Metrics
 		json.Unmarshal(body, &metric)
 		receivedMetrics = append(receivedMetrics, metric)
 
@@ -160,7 +198,6 @@ func TestSend_MultipleMetrics(t *testing.T) {
 }
 
 func TestSend_ErrorHandling(t *testing.T) {
-
 	testMetrics := []models.Metrics{
 		{ID: "TestMetric", MType: models.Gauge, Value: ptrFloat64(1.0)},
 	}
