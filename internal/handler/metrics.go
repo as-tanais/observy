@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -99,6 +100,57 @@ func (h *MetricsHandler) GetMetricHandler(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(value))
+}
+
+func (h *MetricsHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
+	var newMetrics model.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&newMetrics); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	err := h.service.SetNewMetric(newMetrics)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+}
+
+func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
+
+	var metric model.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	if metric.ID == "" {
+		http.Error(w, "metric name cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	output, err := h.service.GetMetric(metric.ID)
+	if err != nil {
+		// Если метрика не найдена - возвращаем 404
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Опционально: проверяем соответствие типа, если он указан
+	if metric.MType != "" && output.MType != metric.MType {
+		http.Error(w, "metric type mismatch", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(output)
+
 }
 
 func (h *MetricsHandler) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
