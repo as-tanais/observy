@@ -54,10 +54,8 @@ func GzipCompressResponse() func(http.Handler) http.Handler {
 			}
 			defer gzipWriter.Close()
 
-			// Устанавливаем заголовок для клиента
 			gzipWriter.Header().Set("Content-Encoding", "gzip")
 
-			// Удаляем Content-Length, так как сжатое содержимое будет другого размера
 			gzipWriter.Header().Del("Content-Length")
 
 			next.ServeHTTP(gzipWriter, r)
@@ -73,15 +71,15 @@ type gzipResponseWriter struct {
 }
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	// Проверяем, нужно ли сжимать этот тип контента
+
 	if !w.written {
 		w.written = true
 		contentType := w.Header().Get("Content-Type")
 
-		// Сжимаем только JSON и HTML
 		if !strings.HasPrefix(contentType, "application/json") &&
-			!strings.HasPrefix(contentType, "text/html") {
-			// Если это не JSON и не HTML, пишем напрямую без сжатия
+			!strings.HasPrefix(contentType, "text/html") &&
+			!strings.HasPrefix(contentType, "text/plain") {
+
 			return w.ResponseWriter.Write(b)
 		}
 	}
