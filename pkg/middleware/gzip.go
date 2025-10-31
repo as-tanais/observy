@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// GzipDecompressRequest распаковывает входящие сжатые запросы
-// Проверяет заголовок Content-Encoding: gzip
 func GzipDecompressRequest() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -21,13 +19,10 @@ func GzipDecompressRequest() func(http.Handler) http.Handler {
 				}
 				defer gzipReader.Close()
 
-				// Заменяем тело запроса на распакованный reader
 				r.Body = io.NopCloser(gzipReader)
 
-				// Удаляем заголовок, так как теперь body уже распакован
 				r.Header.Del("Content-Encoding")
 
-				// Обновляем Content-Length, так как размер изменился
 				r.ContentLength = -1
 			}
 
@@ -36,18 +31,15 @@ func GzipDecompressRequest() func(http.Handler) http.Handler {
 	}
 }
 
-// GzipCompressResponse сжимает ответы клиентам, которые это поддерживают
-// Проверяет заголовок Accept-Encoding: gzip
 func GzipCompressResponse() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Проверяем, поддерживает ли клиент gzip
+
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Оборачиваем ResponseWriter в gzip writer
 			gzipWriter := &gzipResponseWriter{
 				ResponseWriter: w,
 				gzipWriter:     gzip.NewWriter(w),
@@ -63,15 +55,28 @@ func GzipCompressResponse() func(http.Handler) http.Handler {
 	}
 }
 
-// gzipResponseWriter оборачивает http.ResponseWriter для поддержки gzip
 type gzipResponseWriter struct {
 	http.ResponseWriter
 	gzipWriter *gzip.Writer
 	written    bool
 }
 
-func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 
+	contentType := w.Header().Get("Content-Type")
+
+	if !strings.HasPrefix(contentType, "application/json") &&
+		!strings.HasPrefix(contentType, "text/html") &&
+		!strings.HasPrefix(contentType, "text/plain") {
+
+		w.ResponseWriter.WriteHeader(statusCode)
+		return
+	}
+
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	if !w.written {
 		w.written = true
 		contentType := w.Header().Get("Content-Type")
@@ -79,7 +84,6 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 		if !strings.HasPrefix(contentType, "application/json") &&
 			!strings.HasPrefix(contentType, "text/html") &&
 			!strings.HasPrefix(contentType, "text/plain") {
-
 			return w.ResponseWriter.Write(b)
 		}
 	}
