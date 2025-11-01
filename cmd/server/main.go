@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/as-tanais/observy/internal/config"
 	"github.com/as-tanais/observy/internal/handler"
@@ -35,8 +36,21 @@ func run() error {
 	defer logger.Sync()
 
 	storage := repository.NewMemStorage()
-	service := service.NewMetricsService(storage)
+	fileStorage := repository.NewFileStorage(cfg.FileStoragePath)
+
+	service := service.NewMetricsService(storage, fileStorage, cfg.StoreInterval)
 	metricshandler := handler.NewMetricsHandler(service)
+
+	if cfg.Restore {
+		if err := service.LoadMetrics(); err != nil {
+			logger.Warn("Failed to load metrics from file", zap.Error(err))
+			logger.Info("Continuing without backup data")
+		}
+	}
+
+	if cfg.StoreInterval > 0 {
+		go startPeriodicSave(service, cfg.StoreInterval, logger)
+	}
 
 	router := chi.NewRouter()
 
@@ -66,4 +80,15 @@ func run() error {
 	}
 
 	return nil
+}
+
+func startPeriodicSave(service *service.MetricsService, interval time.Duration, logger *zap.Logger) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if err := service.SaveToFile(); err != nil {
+			logger.Warn("Failed to save metrics", zap.Error(err))
+		}
+	}
 }
