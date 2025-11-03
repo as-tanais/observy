@@ -110,7 +110,7 @@ func (h *MetricsHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.service.SetNewMetric(newMetrics)
+	err := h.service.SetMetricWithSync(newMetrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

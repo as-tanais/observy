@@ -3,18 +3,23 @@ package service
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	models "github.com/as-tanais/observy/internal/model"
 	"github.com/as-tanais/observy/internal/repository"
 )
 
 type MetricsService struct {
-	storage repository.Storage
+	storage       repository.Storage
+	fileStorage   *repository.FileStorage
+	storeInterval time.Duration
 }
 
-func NewMetricsService(storage repository.Storage) *MetricsService {
+func NewMetricsService(storage repository.Storage, fileStorage *repository.FileStorage, storeInterval time.Duration) *MetricsService {
 	return &MetricsService{
-		storage: storage,
+		storage:       storage,
+		fileStorage:   fileStorage,
+		storeInterval: storeInterval,
 	}
 }
 
@@ -121,4 +126,35 @@ func (s *MetricsService) SetNewMetric(input models.Metrics) error {
 	default:
 		return fmt.Errorf("unsupported metric type: %s", input.MType)
 	}
+}
+
+func (s *MetricsService) SaveToFile() error {
+	metrics := s.storage.GetAllMetrics()
+	return s.fileStorage.SaveMetrics(metrics)
+}
+
+func (s *MetricsService) LoadMetrics() error {
+	metrics, err := s.fileStorage.LoadMetrics()
+	if err != nil {
+		return err
+	}
+
+	for _, m := range metrics {
+		if err := s.storage.SetMetric(m); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *MetricsService) SetMetricWithSync(model models.Metrics) error {
+	if err := s.SetNewMetric(model); err != nil {
+		return err
+	}
+
+	if s.storeInterval == 0 {
+		return s.SaveToFile()
+	}
+	return nil
 }

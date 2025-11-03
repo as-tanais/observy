@@ -3,7 +3,9 @@ package handler_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -14,6 +16,24 @@ import (
 	"github.com/as-tanais/observy/internal/repository"
 	"github.com/as-tanais/observy/internal/service"
 )
+
+func newTestService(t *testing.T) *service.MetricsService {
+	storage := repository.NewMemStorage()
+
+	tmpFile, err := os.CreateTemp("", "metrics-test-*.json")
+	require.NoError(t, err)
+	defer tmpFile.Close()
+
+	fileStorage := repository.NewFileStorage(tmpFile.Name())
+
+	svc := service.NewMetricsService(storage, fileStorage, 100*time.Second)
+
+	t.Cleanup(func() {
+		os.Remove(tmpFile.Name())
+	})
+
+	return svc
+}
 
 func setupRouter(h *handler.MetricsHandler) *chi.Mux {
 	r := chi.NewRouter()
@@ -90,9 +110,7 @@ func TestMetricsHandler_UpdateMetricHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			storage := repository.NewMemStorage()
-			svc := service.NewMetricsService(storage)
+			svc := newTestService(t)
 			h := handler.NewMetricsHandler(svc)
 
 			router := setupRouter(h)
@@ -178,9 +196,7 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			storage := repository.NewMemStorage()
-			svc := service.NewMetricsService(storage)
+			svc := newTestService(t)
 			h := handler.NewMetricsHandler(svc)
 
 			for name, value := range tt.setupMetrics {
@@ -211,8 +227,7 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 }
 
 func TestMetricsHandler_UpdateAndGet(t *testing.T) {
-	storage := repository.NewMemStorage()
-	svc := service.NewMetricsService(storage)
+	svc := newTestService(t)
 	h := handler.NewMetricsHandler(svc)
 	router := setupRouter(h)
 
@@ -229,8 +244,7 @@ func TestMetricsHandler_UpdateAndGet(t *testing.T) {
 }
 
 func TestMetricsHandler_CounterAccumulation(t *testing.T) {
-	storage := repository.NewMemStorage()
-	svc := service.NewMetricsService(storage)
+	svc := newTestService(t)
 	h := handler.NewMetricsHandler(svc)
 	router := setupRouter(h)
 
