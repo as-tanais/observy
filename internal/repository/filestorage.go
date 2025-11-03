@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 
 	models "github.com/as-tanais/observy/internal/model"
 )
@@ -21,8 +22,16 @@ func (fs *FileStorage) SaveMetrics(metrics []models.Metrics) error {
 	if err != nil {
 		return err
 	}
-	// сохраняем данные в файл
-	return os.WriteFile(fs.filePath, data, 0644)
+
+	dir := filepath.Dir(fs.filePath)
+	fileName := filepath.Base(fs.filePath)
+	tmpFile := filepath.Join(dir, "."+fileName+".tmp")
+
+	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		return err
+	}
+
+	return os.Rename(tmpFile, fs.filePath)
 }
 
 func (fs *FileStorage) LoadMetrics() ([]models.Metrics, error) {

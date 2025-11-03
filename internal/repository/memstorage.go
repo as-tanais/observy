@@ -1,10 +1,13 @@
 package repository
 
 import (
+	"sync"
+
 	models "github.com/as-tanais/observy/internal/model"
 )
 
 type MemStorage struct {
+	mu      sync.RWMutex
 	metrics map[string]models.Metrics
 }
 
@@ -15,10 +18,8 @@ func NewMemStorage() Storage {
 }
 
 func (s *MemStorage) SetMetric(m models.Metrics) error {
-
-	if s.metrics == nil {
-		s.metrics = make(map[string]models.Metrics)
-	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	s.metrics[m.ID] = m
 
@@ -26,11 +27,17 @@ func (s *MemStorage) SetMetric(m models.Metrics) error {
 }
 
 func (s *MemStorage) GetMetric(id string) (models.Metrics, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	m, ok := s.metrics[id]
 	return m, ok
 }
 
 func (s *MemStorage) GetAllMetrics() []models.Metrics {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	metrics := make([]models.Metrics, 0, len(s.metrics))
 
 	for _, metric := range s.metrics {
