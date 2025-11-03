@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/as-tanais/observy/internal/config"
@@ -71,12 +75,39 @@ func run() error {
 		Handler: router,
 	}
 
-	logger.Info("Server is ready",
-		zap.String("listening_on", cfg.Address),
-	)
+	serverErr := make(chan error, 1)
+	go func() {
+		logger.Info("Server is ready", zap.String("listening_on", cfg.Address))
+		serverErr <- server.ListenAndServe()
+	}()
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("server failed: %w", err)
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErr:
+		if err != nil && err != http.ErrServerClosed {
+			return fmt.Errorf("server failed: %w", err)
+		}
+	case <-shutdown:
+		logger.Info("Shutdown signal received, stopping server...")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("Failed to gracefully shutdown server", zap.Error(err))
+	} else {
+		logger.Info("Server stopped")
+	}
+
+	if cfg.FileStoragePath != "" {
+		if err := service.SaveToFile(); err != nil {
+			logger.Error("Failed to save metrics on shutdown", zap.Error(err))
+		} else {
+			logger.Info("Metrics saved successfully on shutdown")
+		}
 	}
 
 	return nil
