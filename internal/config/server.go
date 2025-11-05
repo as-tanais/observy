@@ -15,6 +15,11 @@ type ServerConfig struct {
 	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
+	DBConfig
+}
+
+type DBConfig struct {
+	DSN string
 }
 
 func NewServerConfig() (*ServerConfig, error) {
@@ -22,6 +27,7 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	addrFlag := flag.String("a", "localhost:8080", "Server address host:port")
 	logFlag := flag.String("l", "info", "Log level (debug, info, warn, error)")
+	dbFlag := flag.String("d", "", "Database dsn")
 
 	storeIntervalFlag := flag.Int("i", 300, "Store interval in seconds (0 = synchronous)")
 	fileStoragePathFlag := flag.String("f", getDefaultFilePath(), "File storage path")
@@ -31,6 +37,7 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	cfg.Address = GetEnvOrDefault("ADDRESS", *addrFlag)
 	cfg.LogLevel = GetEnvOrDefault("LOG_LEVEL", *logFlag)
+	cfg.DSN = GetEnvOrDefault("DATABASE_DSN", *dbFlag)
 
 	if envInterval := os.Getenv("STORE_INTERVAL"); envInterval != "" {
 		interval, err := strconv.Atoi(envInterval)

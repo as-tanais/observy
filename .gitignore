@@ -24,3 +24,10 @@ vendor/
 .idea
 .vscode
 metrics-backup.json
+
+# pg data
+/data
+
+# ENV
+
+.env
