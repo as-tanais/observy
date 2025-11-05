@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"sync"
 
 	models "github.com/as-tanais/observy/internal/model"
@@ -17,7 +18,7 @@ func NewMemStorage() Storage {
 	}
 }
 
-func (s *MemStorage) SetMetric(m models.Metrics) error {
+func (s *MemStorage) SetMetric(_ context.Context, m models.Metrics) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -26,23 +27,26 @@ func (s *MemStorage) SetMetric(m models.Metrics) error {
 	return nil
 }
 
-func (s *MemStorage) GetMetric(id string) (models.Metrics, bool) {
+func (s *MemStorage) GetMetric(_ context.Context, id string) (models.Metrics, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	m, ok := s.metrics[id]
-	return m, ok
+
+	if !ok {
+		return models.Metrics{}, ErrMetricNotFound
+	}
+
+	return m, nil
 }
 
-func (s *MemStorage) GetAllMetrics() []models.Metrics {
+func (s *MemStorage) GetAllMetrics(_ context.Context) ([]models.Metrics, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	metrics := make([]models.Metrics, 0, len(s.metrics))
-
 	for _, metric := range s.metrics {
 		metrics = append(metrics, metric)
 	}
-
-	return metrics
+	return metrics, nil
 }

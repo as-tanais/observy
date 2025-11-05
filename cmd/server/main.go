@@ -52,7 +52,7 @@ func run() error {
 	metricshandler := handler.NewMetricsHandler(service)
 
 	if cfg.Restore {
-		if err := service.LoadMetrics(); err != nil {
+		if err := service.LoadMetrics(ctx); err != nil {
 			logger.Warn("Failed to load metrics from file", zap.Error(err))
 			logger.Info("Continuing without backup data")
 		}
@@ -118,7 +118,7 @@ func run() error {
 	}
 
 	if cfg.FileStoragePath != "" {
-		if err := service.SaveToFile(); err != nil {
+		if err := service.SaveToFile(ctx); err != nil {
 			logger.Error("Failed to save metrics on shutdown", zap.Error(err))
 		} else {
 			logger.Info("Metrics saved successfully on shutdown")
@@ -132,8 +132,10 @@ func startPeriodicSave(service *service.MetricsService, interval time.Duration, 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	ctx := context.Background()
+
 	for range ticker.C {
-		if err := service.SaveToFile(); err != nil {
+		if err := service.SaveToFile(ctx); err != nil {
 			logger.Warn("Failed to save metrics", zap.Error(err))
 		}
 	}
