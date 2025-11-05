@@ -14,6 +14,7 @@ import (
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
 	"github.com/as-tanais/observy/internal/service"
+	"github.com/as-tanais/observy/pkg/helpers/pg"
 	"github.com/as-tanais/observy/pkg/logger"
 	"github.com/as-tanais/observy/pkg/middleware"
 	"github.com/go-chi/chi/v5"
@@ -38,6 +39,11 @@ func run() error {
 	}
 
 	defer logger.Sync()
+
+	ctx := context.Background()
+
+	dbConfig, _ := pg.NewPoolConfig(cfg.DSN)
+	pool, _ := pg.NewConnection(ctx, dbConfig)
 
 	storage := repository.NewMemStorage()
 	fileStorage := repository.NewFileStorage(cfg.FileStoragePath)
@@ -69,6 +75,15 @@ func run() error {
 	router.Get("/value/{type}/{name}", metricshandler.GetMetricHandler)
 
 	router.Get("/", metricshandler.ListMetricsHandler)
+
+	router.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		if err := pool.Ping(r.Context()); err != nil {
+			logger.Warn("Database ping failed", zap.Error(err))
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 
 	server := &http.Server{
 		Addr:    cfg.Address,
