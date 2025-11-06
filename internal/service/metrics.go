@@ -52,7 +52,10 @@ func (s *MetricsService) GetMetric(ctx context.Context, metricName string) (mode
 
 	metric, err := s.storage.GetMetric(ctx, metricName)
 	if err != nil {
-		return models.Metrics{}, fmt.Errorf("metric '%s' not found", metricName)
+		if errors.Is(err, repository.ErrMetricNotFound) {
+			return models.Metrics{}, fmt.Errorf("metric '%s' not found", metricName)
+		}
+		return models.Metrics{}, fmt.Errorf("failed to get metric '%s': %w", metricName, err)
 	}
 
 	return metric, nil
