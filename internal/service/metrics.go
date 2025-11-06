@@ -169,3 +169,12 @@ func (s *MetricsService) SetMetricWithSync(ctx context.Context, model models.Met
 	}
 	return nil
 }
+
+func (s *MetricsService) UpdateBatch(ctx context.Context, metrics []models.Metrics) error {
+	for _, m := range metrics {
+		if err := s.SetNewMetric(ctx, m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
