@@ -35,7 +35,7 @@ func (h *MetricsHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err := h.service.SetMetric(metricType, metricName, metricValue)
+	err := h.service.SetMetric(r.Context(), metricType, metricName, metricValue)
 	if err != nil {
 		log.Printf("Failed to set metric: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -64,7 +64,7 @@ func (h *MetricsHandler) GetMetricHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	metric, err := h.service.GetMetric(metricName)
+	metric, err := h.service.GetMetric(r.Context(), metricName)
 	if err != nil {
 		log.Printf("Failed to get metric: %v", err)
 		http.Error(w, "Metric not found", http.StatusNotFound)
@@ -110,7 +110,7 @@ func (h *MetricsHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.service.SetMetricWithSync(newMetrics)
+	err := h.service.SetMetricWithSync(r.Context(), newMetrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -134,7 +134,7 @@ func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	output, err := h.service.GetMetric(metric.ID)
+	output, err := h.service.GetMetric(r.Context(), metric.ID)
 	if err != nil {
 		// Если метрика не найдена - возвращаем 404
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -155,7 +155,11 @@ func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 func (h *MetricsHandler) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 
-	metrics := h.service.GetAllMetrics()
+	metrics, err := h.service.GetAllMetrics(r.Context())
+	if err != nil {
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -23,7 +25,7 @@ func NewMetricsService(storage repository.Storage, fileStorage *repository.FileS
 	}
 }
 
-func (s *MetricsService) SetMetric(metricType, metricName, valueStr string) error {
+func (s *MetricsService) SetMetric(ctx context.Context, metricType, metricName, valueStr string) error {
 	if metricName == "" {
 		return fmt.Errorf("metric name cannot be empty")
 	}
@@ -35,112 +37,121 @@ func (s *MetricsService) SetMetric(metricType, metricName, valueStr string) erro
 
 	switch metricType {
 	case models.Counter:
-		return s.setCounterMetric(&metric, valueStr)
+		return s.setCounterMetric(ctx, &metric, valueStr)
 	case models.Gauge:
-		return s.setGaugeMetric(&metric, valueStr)
+		return s.setGaugeMetric(ctx, &metric, valueStr)
 	default:
 		return fmt.Errorf("unknown metric type: %s", metricType)
 	}
 }
 
-func (s *MetricsService) GetMetric(metricName string) (models.Metrics, error) {
+func (s *MetricsService) GetMetric(ctx context.Context, metricName string) (models.Metrics, error) {
 	if metricName == "" {
 		return models.Metrics{}, fmt.Errorf("metric name cannot be empty")
 	}
 
-	metric, exists := s.storage.GetMetric(metricName)
-	if !exists {
-		return models.Metrics{}, fmt.Errorf("metric '%s' not found", metricName)
+	metric, err := s.storage.GetMetric(ctx, metricName)
+	if err != nil {
+		if errors.Is(err, repository.ErrMetricNotFound) {
+			return models.Metrics{}, fmt.Errorf("metric '%s' not found", metricName)
+		}
+		return models.Metrics{}, fmt.Errorf("failed to get metric '%s': %w", metricName, err)
 	}
 
 	return metric, nil
 }
 
-func (s *MetricsService) setCounterMetric(metric *models.Metrics, valueStr string) error {
+func (s *MetricsService) setCounterMetric(ctx context.Context, metric *models.Metrics, valueStr string) error {
 	v, err := strconv.ParseInt(valueStr, 10, 64)
 	if err != nil {
 		return fmt.Errorf("invalid counter value '%s': %w", valueStr, err)
 	}
 
-	existingMetric, exists := s.storage.GetMetric(metric.ID)
-
-	var newDelta int64
-	if exists && existingMetric.Delta != nil {
-		newDelta = *existingMetric.Delta + v
-	} else {
-		newDelta = v
+	existingMetric, err := s.storage.GetMetric(ctx, metric.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrMetricNotFound) {
+			newDelta := v
+			metric.Delta = &newDelta
+			return s.storage.SetMetric(ctx, *metric)
+		}
+		return fmt.Errorf("failed to get existing counter: %w", err)
 	}
 
+	if existingMetric.Delta == nil {
+		return fmt.Errorf("existing counter has nil delta")
+	}
+	newDelta := *existingMetric.Delta + v
 	metric.Delta = &newDelta
-	return s.storage.SetMetric(*metric)
+	return s.storage.SetMetric(ctx, *metric)
 }
 
-func (s *MetricsService) setGaugeMetric(metric *models.Metrics, valueStr string) error {
+func (s *MetricsService) setGaugeMetric(ctx context.Context, metric *models.Metrics, valueStr string) error {
 	v, err := strconv.ParseFloat(valueStr, 64)
 	if err != nil {
 		return fmt.Errorf("invalid gauge value '%s': %w", valueStr, err)
 	}
-
 	metric.Value = &v
-	return s.storage.SetMetric(*metric)
+	return s.storage.SetMetric(ctx, *metric)
 }
 
-func (s *MetricsService) GetAllMetrics() []models.Metrics {
-	return s.storage.GetAllMetrics()
+func (s *MetricsService) GetAllMetrics(ctx context.Context) ([]models.Metrics, error) {
+	return s.storage.GetAllMetrics(ctx)
 }
 
-func (s *MetricsService) SetNewMetric(input models.Metrics) error {
+func (s *MetricsService) SetNewMetric(ctx context.Context, input models.Metrics) error {
 	if input.ID == "" {
 		return fmt.Errorf("metric name cannot be empty")
 	}
 
 	switch input.MType {
-	case "counter":
-
+	case models.Counter:
 		if input.Delta == nil {
 			return fmt.Errorf("delta value is required for counter metric")
 		}
 
-		existingMetric, exists := s.storage.GetMetric(input.ID)
-
-		var newDelta int64
-		if exists && existingMetric.Delta != nil {
-
-			newDelta = *existingMetric.Delta + *input.Delta
-		} else {
-
-			newDelta = *input.Delta
+		existingMetric, err := s.storage.GetMetric(ctx, input.ID)
+		if err != nil {
+			if errors.Is(err, repository.ErrMetricNotFound) {
+				return s.storage.SetMetric(ctx, input)
+			}
+			return fmt.Errorf("failed to get existing counter: %w", err)
 		}
 
+		if existingMetric.Delta == nil {
+			return fmt.Errorf("existing counter has nil delta")
+		}
+		newDelta := *existingMetric.Delta + *input.Delta
 		input.Delta = &newDelta
-		return s.storage.SetMetric(input)
+		return s.storage.SetMetric(ctx, input)
 
-	case "gauge":
-
+	case models.Gauge:
 		if input.Value == nil {
 			return fmt.Errorf("value is required for gauge metric")
 		}
-
-		return s.storage.SetMetric(input)
+		return s.storage.SetMetric(ctx, input)
 
 	default:
 		return fmt.Errorf("unsupported metric type: %s", input.MType)
 	}
 }
 
-func (s *MetricsService) SaveToFile() error {
-	metrics := s.storage.GetAllMetrics()
+func (s *MetricsService) SaveToFile(ctx context.Context) error {
+	metrics, err := s.storage.GetAllMetrics(ctx)
+	if err != nil {
+		return err
+	}
+
 	return s.fileStorage.SaveMetrics(metrics)
 }
 
-func (s *MetricsService) LoadMetrics() error {
+func (s *MetricsService) LoadMetrics(ctx context.Context) error {
 	metrics, err := s.fileStorage.LoadMetrics()
 	if err != nil {
 		return err
 	}
 
 	for _, m := range metrics {
-		if err := s.storage.SetMetric(m); err != nil {
+		if err := s.storage.SetMetric(ctx, m); err != nil {
 			return err
 		}
 	}
@@ -148,13 +159,13 @@ func (s *MetricsService) LoadMetrics() error {
 	return nil
 }
 
-func (s *MetricsService) SetMetricWithSync(model models.Metrics) error {
-	if err := s.SetNewMetric(model); err != nil {
+func (s *MetricsService) SetMetricWithSync(ctx context.Context, model models.Metrics) error {
+	if err := s.SetNewMetric(ctx, model); err != nil {
 		return err
 	}
 
 	if s.storeInterval == 0 {
-		return s.SaveToFile()
+		return s.SaveToFile(ctx)
 	}
 	return nil
 }
