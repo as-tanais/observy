@@ -12,6 +12,7 @@ import (
 	"time"
 
 	models "github.com/as-tanais/observy/internal/model"
+	"github.com/as-tanais/observy/pkg/helpers/retry"
 )
 
 var client = &http.Client{
@@ -87,39 +88,39 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 		return fmt.Errorf("gzip write error: %w", err)
 	}
 
-	// ВАЖНО: закрываем writer, иначе данные не будут полностью записаны
 	if err := gzipWriter.Close(); err != nil {
 		return fmt.Errorf("gzip close error: %w", err)
 	}
 
+	compressedData := compressedBuffer.Bytes()
 	url := fmt.Sprintf("%s/update/", serverAddress)
 
-	// Создаём запрос со сжатыми данными
-	req, err := http.NewRequest(http.MethodPost, url, &compressedBuffer)
-	if err != nil {
-		return fmt.Errorf("creating request error: %w", err)
-	}
+	return retry.WithBackoff(func() error {
 
-	// Указываем, что тело запроса сжато с помощью gzip
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressedData))
+		if err != nil {
+			return fmt.Errorf("creating request error: %w", err)
+		}
 
-	// Указываем, что агент поддерживает сжатые ответы
-	req.Header.Set("Accept-Encoding", "gzip")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("sending error: %w", err)
-	}
+		req.Header.Set("Accept-Encoding", "gzip")
 
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("sending error: %w", err)
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
+		defer resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
 
-	return nil
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("server returned status %d", resp.StatusCode)
+		}
+
+		return nil
+	})
 }
 
 func validateMetric(metric models.Metrics) error {
@@ -171,27 +172,29 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 	compressedData := compressedBuffer.Bytes()
 	url := fmt.Sprintf("%s/updates/", serverAddress)
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressedData))
-	if err != nil {
-		return fmt.Errorf("creating request error: %w", err)
-	}
+	return retry.WithBackoff(func() error { // ✅ ПРАВИЛЬНО
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressedData))
+		if err != nil {
+			return fmt.Errorf("creating request error: %w", err)
+		}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-	req.Header.Set("Content-Length", strconv.Itoa(len(compressedData)))
-	req.Header.Set("Accept-Encoding", "gzip")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Content-Length", strconv.Itoa(len(compressedData)))
+		req.Header.Set("Accept-Encoding", "gzip")
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("sending error: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("sending error: %w", err)
+		}
+		defer resp.Body.Close()
 
-	io.Copy(io.Discard, resp.Body)
+		io.Copy(io.Discard, resp.Body)
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("server returned status %d", resp.StatusCode)
+		}
 
-	return nil
+		return nil
+	})
 }
