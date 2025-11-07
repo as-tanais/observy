@@ -136,12 +136,11 @@ func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 	output, err := h.service.GetMetric(r.Context(), metric.ID)
 	if err != nil {
-		// Если метрика не найдена - возвращаем 404
+
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	// Опционально: проверяем соответствие типа, если он указан
 	if metric.MType != "" && output.MType != metric.MType {
 		http.Error(w, "metric type mismatch", http.StatusBadRequest)
 		return
@@ -151,6 +150,27 @@ func (h *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(output)
 
+}
+
+func (h *MetricsHandler) UpdateMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	var input []model.Metrics
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	if len(input) == 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if err := h.service.UpdateBatch(r.Context(), input); err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *MetricsHandler) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {

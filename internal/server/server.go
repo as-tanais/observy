@@ -94,6 +94,7 @@ func Run() error {
 	router.Post("/update/{type}/{name}/{value}", h.UpdateMetricHandler)
 	router.Get("/value/{type}/{name}", h.GetMetricHandler)
 	router.Get("/", h.ListMetricsHandler)
+	router.Post("/updates/", h.UpdateMetricsHandler)
 
 	if pool != nil {
 		router.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
@@ -149,11 +150,8 @@ func Run() error {
 }
 
 func startPeriodicSave(svc *service.MetricsService, interval time.Duration, logger *zap.Logger) {
-
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-
-	logger.Warn("ВЫЗВАЛИ")
 
 	ctx := context.Background()
 

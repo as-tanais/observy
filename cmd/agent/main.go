@@ -31,6 +31,7 @@ func main() {
 		}
 
 		agent.Send(metrics, cfg.ServerURL())
+		agent.SendBatchMetrics(metrics, cfg.ServerURL())
 
 		time.Sleep(cfg.PollInterval)
 	}
