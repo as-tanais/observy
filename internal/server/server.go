@@ -82,10 +82,15 @@ func Run() error {
 		}
 	}
 
+	log.Info("KEY ---- КЛЮЮЮЮЮЧЧЧЧЧ", zap.String("KEy", cfg.Key))
+
 	router := chi.NewRouter()
 	router.Use(middleware.WithLogging(log))
 	router.Use(middleware.GzipDecompressRequest())
-	router.Use(middleware.SignatureMiddleware(cfg.Key))
+	log.Info("Signature middleware enabled", zap.Bool("enabled", cfg.Key != ""))
+	if cfg.Key != "" {
+		router.Use(middleware.SignatureMiddleware(cfg.Key))
+	}
 	router.Use(middleware.GzipCompressResponse())
 
 	h := handler.NewMetricsHandler(service)
