@@ -82,7 +82,7 @@ func Run() error {
 		}
 	}
 
-	log.Info("KEY ---- КЛЮЮЮЮЮЧЧЧЧЧ", zap.String("KEy", cfg.Key))
+	log.Info("Final server key", zap.String("key", cfg.Key))
 
 	router := chi.NewRouter()
 	router.Use(middleware.WithLogging(log))
