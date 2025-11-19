@@ -1,10 +1,14 @@
 package agent
 
 import (
+	"fmt"
 	"math/rand"
 	"runtime"
+	"time"
 
 	models "github.com/as-tanais/observy/internal/model"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 func toFloat64(v uint64) *float64 {
@@ -59,6 +63,29 @@ func Collect() []models.Metrics {
 		models.Metrics{ID: "PollCount", MType: models.Counter, Delta: &delta},
 		models.Metrics{ID: "RandomValue", MType: models.Gauge, Value: &randomValue},
 	)
+
+	return metrics
+}
+
+func CollectSystemMetrics() []models.Metrics {
+	var metrics []models.Metrics
+
+	if v, err := mem.VirtualMemory(); err == nil {
+		metrics = append(metrics,
+			models.Metrics{ID: "TotalMemory", MType: models.Gauge, Value: toFloat64(v.Total)},
+			models.Metrics{ID: "FreeMemory", MType: models.Gauge, Value: toFloat64(v.Available)},
+		)
+	}
+
+	if c, err := cpu.Percent(time.Second, true); err == nil {
+		for i, pct := range c {
+			metrics = append(metrics, models.Metrics{
+				ID:    fmt.Sprintf("CPUutilization%d", i),
+				MType: models.Gauge,
+				Value: &pct,
+			})
+		}
+	}
 
 	return metrics
 }

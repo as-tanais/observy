@@ -3,11 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 
-	"github.com/as-tanais/observy/internal/agent"
 	"github.com/as-tanais/observy/internal/config"
-	models "github.com/as-tanais/observy/internal/model"
 )
 
 func main() {
@@ -19,20 +16,22 @@ func main() {
 	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v\n",
 		cfg.ServerURL(), cfg.PollInterval, cfg.ReportInterval)
 
-	for {
-		var metrics []models.Metrics
+	//тут нужно запустить 3 рутины
 
-		for i := 0; i < cfg.PollsPerReport(); i++ {
-			metrics = agent.Collect()
+	// for {
+	// 	var metrics []models.Metrics
 
-			if i < cfg.PollsPerReport()-1 {
-				time.Sleep(cfg.PollInterval)
-			}
-		}
+	// 	for i := 0; i < cfg.PollsPerReport(); i++ {
+	// 		metrics = agent.Collect()
 
-		agent.Send(metrics, cfg.ServerURL(), cfg.Key)
-		agent.SendBatchMetrics(metrics, cfg.ServerURL(), cfg.Key)
+	// 		if i < cfg.PollsPerReport()-1 {
+	// 			time.Sleep(cfg.PollInterval)
+	// 		}
+	// 	}
 
-		time.Sleep(cfg.PollInterval)
-	}
+	// 	agent.Send(metrics, cfg.ServerURL(), cfg.Key)
+	// 	agent.SendBatchMetrics(metrics, cfg.ServerURL(), cfg.Key)
+
+	// 	time.Sleep(cfg.PollInterval)
+	// }
 }
