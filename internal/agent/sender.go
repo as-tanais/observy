@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	models "github.com/as-tanais/observy/internal/model"
@@ -97,15 +96,10 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 
 	return retry.WithBackoff(func() error {
 
-		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressedData))
+		req, err := HttpReq(http.MethodPost, url, compressedData)
 		if err != nil {
 			return fmt.Errorf("creating request error: %w", err)
 		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Content-Encoding", "gzip")
-
-		req.Header.Set("Accept-Encoding", "gzip")
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -172,16 +166,11 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 	compressedData := compressedBuffer.Bytes()
 	url := fmt.Sprintf("%s/updates/", serverAddress)
 
-	return retry.WithBackoff(func() error { // ✅ ПРАВИЛЬНО
-		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressedData))
+	return retry.WithBackoff(func() error {
+		req, err := HttpReq(http.MethodPost, url, compressedData)
 		if err != nil {
 			return fmt.Errorf("creating request error: %w", err)
 		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Content-Encoding", "gzip")
-		req.Header.Set("Content-Length", strconv.Itoa(len(compressedData)))
-		req.Header.Set("Accept-Encoding", "gzip")
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -197,4 +186,17 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 
 		return nil
 	})
+}
+
+func HttpReq(method string, url string, data []byte) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	return req, nil
 }
