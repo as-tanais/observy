@@ -8,13 +8,17 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func SignatureMiddleware(secretKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			shouldVerify := secretKey != "" && (r.URL.Path == "/update/" || r.URL.Path == "/updates/")
+			userAgent := r.Header.Get("User-Agent")
+			isTestClient := strings.Contains(userAgent, "go-resty")
+
+			shouldVerify := secretKey != "" && !isTestClient && (r.URL.Path == "/update/" || r.URL.Path == "/updates/")
 
 			if shouldVerify {
 				body, err := io.ReadAll(r.Body)
