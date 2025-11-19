@@ -10,6 +10,7 @@ type AgentConfig struct {
 	ServerAddress  string
 	PollInterval   time.Duration
 	ReportInterval time.Duration
+	Key            string
 }
 
 func NewAgentConfig() (*AgentConfig, error) {
@@ -18,6 +19,7 @@ func NewAgentConfig() (*AgentConfig, error) {
 	addrFlag := flag.String("a", "localhost:8080", "Server address host:port")
 	pollFlag := flag.Int("p", 2, "Poll interval in seconds")
 	reportFlag := flag.Int("r", 10, "Report interval in seconds")
+	keyFlag := flag.String("k", "", "Secret key for request singing")
 
 	flag.Parse()
 
@@ -34,6 +36,8 @@ func NewAgentConfig() (*AgentConfig, error) {
 		return nil, fmt.Errorf("invalid REPORT_INTERVAL: %w", err)
 	}
 	cfg.ReportInterval = time.Duration(reportSec) * time.Second
+
+	cfg.Key = GetEnvOrDefault("KEY", *keyFlag)
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err

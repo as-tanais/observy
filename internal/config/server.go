@@ -15,6 +15,7 @@ type ServerConfig struct {
 	StoreInterval   time.Duration
 	FileStoragePath string
 	Restore         bool
+	Key             string
 	DBConfig
 }
 
@@ -32,6 +33,8 @@ func NewServerConfig() (*ServerConfig, error) {
 	storeIntervalFlag := flag.Int("i", 300, "Store interval in seconds (0 = synchronous)")
 	fileStoragePathFlag := flag.String("f", getDefaultFilePath(), "File storage path")
 	restoreFlag := flag.Bool("r", true, "Restore previously saved values on startup")
+
+	keyFlag := flag.String("k", "", "Secret key for request singing")
 
 	flag.Parse()
 
@@ -60,6 +63,8 @@ func NewServerConfig() (*ServerConfig, error) {
 	} else {
 		cfg.Restore = *restoreFlag
 	}
+
+	cfg.Key = GetEnvOrDefault("KEY", *keyFlag)
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
