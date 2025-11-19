@@ -112,6 +112,9 @@ func sendMetricJSON(metric models.Metrics, serverAddress string, key string) err
 
 		if hash != "" {
 			req.Header.Set("HashSHA256", hash)
+			log.Printf("SET HashSHA256: %s", hash)
+		} else {
+			log.Printf("NO HashSHA256 (key=%q)", key)
 		}
 
 		resp, err := client.Do(req)
