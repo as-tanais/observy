@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -29,9 +30,16 @@ func SignatureMiddleware(secretKey string) func(http.Handler) http.Handler {
 						return
 					}
 
+					log.Printf("SERVER DEBUG: PATH=%s", r.URL.Path)
+					log.Printf("SERVER DEBUG: JSON=%s", string(body))
+					log.Printf("SERVER DEBUG: KEY=%q", secretKey)
+					log.Printf("SERVER DEBUG: RECEIVED_HASH=%s", receivedHash)
+
 					mac := hmac.New(sha256.New, []byte(secretKey))
 					mac.Write(body)
 					expectedHash := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+					log.Printf("SERVER DEBUG: EXPECTED_HASH=%s", expectedHash)
 
 					if receivedHash != expectedHash {
 						http.Error(w, "invalid HashSHA256", http.StatusBadRequest)
