@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,9 +25,9 @@ var client = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
-func Send(metrics []models.Metrics, serverAddress string) {
+func Send(metrics []models.Metrics, serverAddress string, key string) {
 	for _, metric := range metrics {
-		if err := sendMetricJSON(metric, serverAddress); err != nil {
+		if err := sendMetricJSON(metric, serverAddress, key); err != nil {
 			log.Printf("sending error %s: %v", metric.ID, err)
 		}
 	}
@@ -73,7 +76,7 @@ func sendMetric(metric models.Metrics, serverAddress string) error {
 	return nil
 }
 
-func sendMetricJSON(metric models.Metrics, serverAddress string) error {
+func sendMetricJSON(metric models.Metrics, serverAddress string, key string) error {
 	if err := validateMetric(metric); err != nil {
 		return err
 	}
@@ -82,6 +85,8 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 	if err != nil {
 		return fmt.Errorf("json marshal error: %w", err)
 	}
+
+	hash := calculateHashSHA256(jsonData, key)
 
 	// Сжимаем JSON-данные с помощью gzip
 	var compressedBuffer bytes.Buffer
@@ -103,6 +108,10 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 		req, err := newCompressedJSONRequest(http.MethodPost, url, compressedData)
 		if err != nil {
 			return fmt.Errorf("creating request error: %w", err)
+		}
+
+		if hash != "" {
+			req.Header.Set("HashSHA256", hash)
 		}
 
 		resp, err := client.Do(req)
@@ -142,7 +151,7 @@ func validateMetric(metric models.Metrics) error {
 	return nil
 }
 
-func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
+func SendBatchMetrics(metrics []models.Metrics, serverAddress string, key string) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -157,6 +166,8 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 	if err != nil {
 		return fmt.Errorf("json marshal error: %w", err)
 	}
+
+	hash := calculateHashSHA256(jsonData, key)
 
 	var compressedBuffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&compressedBuffer)
@@ -174,6 +185,10 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 		req, err := newCompressedJSONRequest(http.MethodPost, url, compressedData)
 		if err != nil {
 			return fmt.Errorf("creating request error: %w", err)
+		}
+
+		if hash != "" {
+			req.Header.Set("HashSHA256", hash)
 		}
 
 		resp, err := client.Do(req)
@@ -220,4 +235,13 @@ func isRetriable(err error) bool {
 	}
 
 	return false
+}
+
+func calculateHashSHA256(data []byte, key string) string {
+	if key == "" {
+		return ""
+	}
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write(data)
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
