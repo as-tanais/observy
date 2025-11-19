@@ -3,11 +3,15 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"syscall"
 	"time"
 
 	models "github.com/as-tanais/observy/internal/model"
@@ -114,7 +118,7 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 		}
 
 		return nil
-	})
+	}, isRetriable)
 }
 
 func validateMetric(metric models.Metrics) error {
@@ -185,7 +189,7 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 		}
 
 		return nil
-	})
+	}, isRetriable)
 }
 
 func newCompressedJSONRequest(method string, url string, data []byte) (*http.Request, error) {
@@ -199,4 +203,21 @@ func newCompressedJSONRequest(method string, url string, data []byte) (*http.Req
 	req.Header.Set("Accept-Encoding", "gzip")
 
 	return req, nil
+}
+
+func isRetriable(err error) bool {
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
+
+	return false
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/as-tanais/observy/pkg/helpers/pg/pgretry"
 	"github.com/as-tanais/observy/pkg/helpers/retry"
 )
 
@@ -33,19 +34,17 @@ func (r *PGStorage) SetMetric(ctx context.Context, m models.Metrics) error {
 			m.ID, m.MType, m.Delta, m.Value, m.Hash,
 		)
 		return err
-	})
+	}, pgretry.IsRetriable)
 }
 
 func (r *PGStorage) GetMetric(ctx context.Context, id string) (models.Metrics, error) {
 
 	var m models.Metrics
 
-	err := retry.WithBackoff(func() error {
-		return r.db.QueryRow(ctx,
-			`SELECT id, m_type, delta, value, hash FROM metrics WHERE id = $1`,
-			id,
-		).Scan(&m.ID, &m.MType, &m.Delta, &m.Value, &m.Hash)
-	})
+	err := r.db.QueryRow(ctx,
+		`SELECT id, m_type, delta, value, hash FROM metrics WHERE id = $1`,
+		id,
+	).Scan(&m.ID, &m.MType, &m.Delta, &m.Value, &m.Hash)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -59,16 +58,13 @@ func (r *PGStorage) GetMetric(ctx context.Context, id string) (models.Metrics, e
 func (r *PGStorage) GetAllMetrics(ctx context.Context) ([]models.Metrics, error) {
 	var metrics []models.Metrics
 
-	err := retry.WithBackoff(func() error {
-		rows, err := r.db.Query(ctx, `SELECT id, m_type, delta, value, hash FROM metrics`)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
+	rows, err := r.db.Query(ctx, `SELECT id, m_type, delta, value, hash FROM metrics`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-		metrics, err = pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
-		return err
-	})
+	metrics, err = pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
 
 	if err != nil {
 		return nil, err
