@@ -88,10 +88,6 @@ func sendMetricJSON(metric models.Metrics, serverAddress string, key string) err
 
 	hash := calculateHashSHA256(jsonData, key)
 
-	log.Printf("AGENT DEBUG: JSON=%s", string(jsonData))
-	log.Printf("AGENT DEBUG: KEY=%q", key)
-	log.Printf("AGENT DEBUG: HASH=%s", hash)
-
 	// Сжимаем JSON-данные с помощью gzip
 	var compressedBuffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&compressedBuffer)
@@ -116,9 +112,7 @@ func sendMetricJSON(metric models.Metrics, serverAddress string, key string) err
 
 		if hash != "" {
 			req.Header.Set("HashSHA256", hash)
-			log.Printf("SET HashSHA256: %s", hash)
-		} else {
-			log.Printf("NO HashSHA256 (key=%q)", key)
+
 		}
 
 		resp, err := client.Do(req)

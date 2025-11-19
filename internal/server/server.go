@@ -82,12 +82,9 @@ func Run() error {
 		}
 	}
 
-	log.Info("Final server key", zap.String("key", cfg.Key))
-
 	router := chi.NewRouter()
 	router.Use(middleware.WithLogging(log))
 	router.Use(middleware.GzipDecompressRequest())
-	log.Info("Signature middleware enabled", zap.Bool("enabled", cfg.Key != ""))
 	if cfg.Key != "" {
 		router.Use(middleware.SignatureMiddleware(cfg.Key))
 	}
