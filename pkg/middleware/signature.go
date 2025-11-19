@@ -13,9 +13,9 @@ func SignatureMiddleware(secretKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			if secretKey != "" {
+			if secretKey != "" && r.ContentLength > 0 {
 
-				if r.ContentLength > 0 {
+				if r.URL.Path == "/update/" || r.URL.Path == "/updates/" {
 					body, err := io.ReadAll(r.Body)
 					if err != nil {
 						http.Error(w, "failed to read request body", http.StatusBadRequest)
@@ -52,12 +52,6 @@ func SignatureMiddleware(secretKey string) func(http.Handler) http.Handler {
 				mac := hmac.New(sha256.New, []byte(secretKey))
 				mac.Write(recorder.buf.Bytes())
 				hash := base64.StdEncoding.EncodeToString(mac.Sum(nil))
-
-				for k, vv := range recorder.Header() {
-					for _, v := range vv {
-						w.Header().Add(k, v)
-					}
-				}
 
 				w.Header().Set("HashSHA256", hash)
 
