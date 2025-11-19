@@ -96,7 +96,7 @@ func sendMetricJSON(metric models.Metrics, serverAddress string) error {
 
 	return retry.WithBackoff(func() error {
 
-		req, err := HttpReq(http.MethodPost, url, compressedData)
+		req, err := newCompressedJSONRequest(http.MethodPost, url, compressedData)
 		if err != nil {
 			return fmt.Errorf("creating request error: %w", err)
 		}
@@ -167,7 +167,7 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 	url := fmt.Sprintf("%s/updates/", serverAddress)
 
 	return retry.WithBackoff(func() error {
-		req, err := HttpReq(http.MethodPost, url, compressedData)
+		req, err := newCompressedJSONRequest(http.MethodPost, url, compressedData)
 		if err != nil {
 			return fmt.Errorf("creating request error: %w", err)
 		}
@@ -188,7 +188,7 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string) error {
 	})
 }
 
-func HttpReq(method string, url string, data []byte) (*http.Request, error) {
+func newCompressedJSONRequest(method string, url string, data []byte) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
