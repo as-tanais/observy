@@ -29,7 +29,6 @@ func SignatureMiddleware(secretKey string) func(http.Handler) http.Handler {
 						return
 					}
 
-					// Считаем ожидаемый хеш от тела + секретного ключа
 					mac := hmac.New(sha256.New, []byte(secretKey))
 					mac.Write(body)
 					expectedHash := base64.StdEncoding.EncodeToString(mac.Sum(nil))
