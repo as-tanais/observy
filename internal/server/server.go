@@ -85,6 +85,7 @@ func Run() error {
 	router := chi.NewRouter()
 	router.Use(middleware.WithLogging(log))
 	router.Use(middleware.GzipDecompressRequest())
+	router.Use(middleware.SignatureMiddleware(cfg.Key))
 	router.Use(middleware.GzipCompressResponse())
 
 	h := handler.NewMetricsHandler(service)
