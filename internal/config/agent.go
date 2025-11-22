@@ -11,6 +11,7 @@ type AgentConfig struct {
 	PollInterval   time.Duration
 	ReportInterval time.Duration
 	Key            string
+	RateLimit      int
 }
 
 func NewAgentConfig() (*AgentConfig, error) {
@@ -20,6 +21,7 @@ func NewAgentConfig() (*AgentConfig, error) {
 	pollFlag := flag.Int("p", 2, "Poll interval in seconds")
 	reportFlag := flag.Int("r", 10, "Report interval in seconds")
 	keyFlag := flag.String("k", "", "Secret key for request singing")
+	limitFlag := flag.Int("l", 1, "Rate limit")
 
 	flag.Parse()
 
@@ -39,6 +41,13 @@ func NewAgentConfig() (*AgentConfig, error) {
 
 	cfg.Key = GetEnvOrDefault("KEY", *keyFlag)
 
+	rateLimit, err := GetEnvIntOrDefault("RATE_LIMIT", *limitFlag)
+	if err != nil {
+		return nil, fmt.Errorf("invalid rate limit: %w", err)
+	}
+
+	cfg.RateLimit = rateLimit
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -52,6 +61,9 @@ func (c *AgentConfig) Validate() error {
 	}
 	if c.ReportInterval <= 0 {
 		return fmt.Errorf("report interval must be positive")
+	}
+	if c.RateLimit <= 0 {
+		return fmt.Errorf("rate limit must be positive, got %d", c.RateLimit)
 	}
 	return nil
 }
