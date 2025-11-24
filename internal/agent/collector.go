@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -67,7 +68,26 @@ func Collect() []models.Metrics {
 	return metrics
 }
 
-func CollectSystemMetrics() []models.Metrics {
+func CollectCpuData(cpuDataChan chan<- []float64, ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		default:
+			percentages, err := cpu.Percent(time.Second, true)
+			if err == nil {
+				select {
+				case cpuDataChan <- percentages:
+				default:
+				}
+			}
+		}
+
+	}
+}
+
+func CollectSystemMetrics(cpuDataChan <-chan []float64) []models.Metrics {
 	var metrics []models.Metrics
 
 	if v, err := mem.VirtualMemory(); err == nil {
@@ -77,7 +97,8 @@ func CollectSystemMetrics() []models.Metrics {
 		)
 	}
 
-	if c, err := cpu.Percent(time.Second, true); err == nil {
+	select {
+	case c := <-cpuDataChan:
 		for i, pct := range c {
 			metrics = append(metrics, models.Metrics{
 				ID:    fmt.Sprintf("CPUutilization%d", i),
@@ -85,6 +106,8 @@ func CollectSystemMetrics() []models.Metrics {
 				Value: &pct,
 			})
 		}
+	default:
+
 	}
 
 	return metrics
