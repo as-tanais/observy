@@ -68,7 +68,7 @@ func Collect() []models.Metrics {
 	return metrics
 }
 
-func CollectCpuData(cpuDataChan chan<- []float64, ctx context.Context) {
+func CollectCPUData(cpuDataChan chan<- []float64, ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():

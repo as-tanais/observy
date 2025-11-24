@@ -73,7 +73,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		agent.CollectCpuData(cpuDataChan, ctx)
+		agent.CollectCPUData(cpuDataChan, ctx)
 	}()
 
 	go func() {
