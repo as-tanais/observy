@@ -86,11 +86,7 @@ func Run() error {
 
 		if cfg.AuditURL != "" {
 			httpSub := audit.NewHTTPSub(cfg.AuditURL)
-			if err != nil {
-				log.Warn("Не удалось создать http адитор", zap.Error(err))
-			} else {
-				subs = append(subs, httpSub)
-			}
+			subs = append(subs, httpSub)
 		}
 
 		if len(subs) > 0 {
