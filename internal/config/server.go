@@ -17,6 +17,8 @@ type ServerConfig struct {
 	Restore         bool
 	Key             string
 	DBConfig
+	AuditFile string
+	AuditURL  string
 }
 
 type DBConfig struct {
@@ -36,11 +38,17 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	keyFlag := flag.String("k", "", "Secret key for request singing")
 
+	auditFileFlag := flag.String("audit-file", "", "file audit logs path")
+	auditURLFlag := flag.String("audit-url", "", "url audit logs address")
+
 	flag.Parse()
 
 	cfg.Address = GetEnvOrDefault("ADDRESS", *addrFlag)
 	cfg.LogLevel = GetEnvOrDefault("LOG_LEVEL", *logFlag)
 	cfg.DSN = GetEnvOrDefault("DATABASE_DSN", *dbFlag)
+
+	cfg.AuditFile = GetEnvOrDefault("AUDIT_FILE", *auditFileFlag)
+	cfg.AuditURL = GetEnvOrDefault("AUDIT_URL", *auditURLFlag)
 
 	if envInterval := os.Getenv("STORE_INTERVAL"); envInterval != "" {
 		interval, err := strconv.Atoi(envInterval)

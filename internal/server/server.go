@@ -70,6 +70,12 @@ func Run() error {
 		fileStorage = repository.NewFileStorage(cfg.FileStoragePath)
 	}
 
+	//тут надо создать наблюдатея
+	if cfg.AuditFile != "" || cfg.AuditURL != "" {
+		//если то создаем наблюдателя
+	}
+	//если пустые то наблюдатель не нужен
+
 	service := service.NewMetricsService(storage, fileStorage, cfg.StoreInterval)
 
 	if cfg.StoreInterval > 0 && fileStorage != nil {
