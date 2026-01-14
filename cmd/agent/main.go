@@ -15,14 +15,13 @@ import (
 	models "github.com/as-tanais/observy/internal/model"
 )
 
-func worker(jobs <-chan []models.Metrics, address, key string, wg *sync.WaitGroup) {
+func worker(jobs <-chan []models.Metrics, address, key string, wg *sync.WaitGroup, reportInterval time.Duration) {
 	defer wg.Done()
 	for m := range jobs {
 		agent.Send(m, address, key)
 		agent.SendBatchMetrics(m, address, key)
-
+		time.Sleep(reportInterval)
 	}
-
 }
 
 func main() {
@@ -47,7 +46,7 @@ func main() {
 	wg.Add(totalGoR)
 
 	for i := 0; i < cfg.RateLimit; i++ {
-		go worker(tasks, cfg.ServerURL(), cfg.Key, &wg)
+		go worker(tasks, cfg.ServerURL(), cfg.Key, &wg, cfg.ReportInterval)
 	}
 
 	go func() {
