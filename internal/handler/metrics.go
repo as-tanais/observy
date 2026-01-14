@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -35,7 +36,7 @@ func (h *MetricsHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err := h.service.SetMetric(r.Context(), metricType, metricName, metricValue)
+	err := h.service.SetMetric(r.Context(), metricType, metricName, metricValue, getIPAddress(r))
 	if err != nil {
 		log.Printf("Failed to set metric: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -110,7 +111,7 @@ func (h *MetricsHandler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.service.SetMetricWithSync(r.Context(), newMetrics)
+	err := h.service.SetMetricWithSync(r.Context(), newMetrics, getIPAddress(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -165,7 +166,7 @@ func (h *MetricsHandler) UpdateMetricsHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.service.UpdateBatch(r.Context(), input); err != nil {
+	if err := h.service.UpdateBatch(r.Context(), input, getIPAddress(r)); err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
@@ -255,4 +256,28 @@ func (h *MetricsHandler) ListMetricsHandler(w http.ResponseWriter, r *http.Reque
 `
 
 	w.Write([]byte(html))
+}
+
+func getIPAddress(r *http.Request) string {
+
+	forwardedFor := r.Header.Get("X-Forwarded-For")
+	if forwardedFor != "" {
+		ips := strings.Split(forwardedFor, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	realIP := r.Header.Get("X-Real-IP")
+	if realIP != "" {
+		return realIP
+	}
+
+	remoteAddr := r.RemoteAddr
+
+	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
+		remoteAddr = remoteAddr[:idx]
+	}
+
+	return remoteAddr
 }
