@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/as-tanais/observy/internal/audit"
 	"github.com/as-tanais/observy/internal/config"
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
@@ -70,7 +71,30 @@ func Run() error {
 		fileStorage = repository.NewFileStorage(cfg.FileStoragePath)
 	}
 
-	service := service.NewMetricsService(storage, fileStorage, cfg.StoreInterval)
+	var observer *audit.Observer
+	if cfg.AuditFile != "" || cfg.AuditURL != "" {
+		var subs []audit.Subscriber
+
+		if cfg.AuditFile != "" {
+			fileSub, err := audit.NewFileSub(cfg.AuditFile)
+			if err != nil {
+				log.Warn("Не удалось создать файловый адитор", zap.Error(err))
+			} else {
+				subs = append(subs, fileSub)
+			}
+		}
+
+		if cfg.AuditURL != "" {
+			httpSub := audit.NewHTTPSub(cfg.AuditURL)
+			subs = append(subs, httpSub)
+		}
+
+		if len(subs) > 0 {
+			observer = audit.NewObserver(subs...)
+		}
+	}
+
+	service := service.NewMetricsService(storage, fileStorage, cfg.StoreInterval, observer)
 
 	if cfg.StoreInterval > 0 && fileStorage != nil {
 		go startPeriodicSave(service, cfg.StoreInterval, log)

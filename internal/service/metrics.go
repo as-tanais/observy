@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/as-tanais/observy/internal/audit"
 	models "github.com/as-tanais/observy/internal/model"
 	"github.com/as-tanais/observy/internal/repository"
 )
@@ -15,17 +16,24 @@ type MetricsService struct {
 	storage       repository.Storage
 	fileStorage   *repository.FileStorage
 	storeInterval time.Duration
+	observer      *audit.Observer
 }
 
-func NewMetricsService(storage repository.Storage, fileStorage *repository.FileStorage, storeInterval time.Duration) *MetricsService {
+func NewMetricsService(
+	storage repository.Storage,
+	fileStorage *repository.FileStorage,
+	storeInterval time.Duration,
+	observer *audit.Observer,
+) *MetricsService {
 	return &MetricsService{
 		storage:       storage,
 		fileStorage:   fileStorage,
 		storeInterval: storeInterval,
+		observer:      observer,
 	}
 }
 
-func (s *MetricsService) SetMetric(ctx context.Context, metricType, metricName, valueStr string) error {
+func (s *MetricsService) SetMetric(ctx context.Context, metricType, metricName, valueStr, ipAddress string) error {
 	if metricName == "" {
 		return fmt.Errorf("metric name cannot be empty")
 	}
@@ -35,14 +43,21 @@ func (s *MetricsService) SetMetric(ctx context.Context, metricType, metricName, 
 		MType: metricType,
 	}
 
+	var err error
 	switch metricType {
 	case models.Counter:
-		return s.setCounterMetric(ctx, &metric, valueStr)
+		err = s.setCounterMetric(ctx, &metric, valueStr)
 	case models.Gauge:
-		return s.setGaugeMetric(ctx, &metric, valueStr)
+		err = s.setGaugeMetric(ctx, &metric, valueStr)
 	default:
-		return fmt.Errorf("unknown metric type: %s", metricType)
+		err = fmt.Errorf("unknown metric type: %s", metricType)
 	}
+
+	if err == nil {
+		s.auditOperation(ctx, metricName, ipAddress)
+	}
+
+	return err
 }
 
 func (s *MetricsService) GetMetric(ctx context.Context, metricName string) (models.Metrics, error) {
@@ -98,41 +113,49 @@ func (s *MetricsService) GetAllMetrics(ctx context.Context) ([]models.Metrics, e
 	return s.storage.GetAllMetrics(ctx)
 }
 
-func (s *MetricsService) SetNewMetric(ctx context.Context, input models.Metrics) error {
+func (s *MetricsService) SetNewMetric(ctx context.Context, input models.Metrics, ipAddress string) error {
 	if input.ID == "" {
 		return fmt.Errorf("metric name cannot be empty")
 	}
 
+	var err error
 	switch input.MType {
 	case models.Counter:
 		if input.Delta == nil {
 			return fmt.Errorf("delta value is required for counter metric")
 		}
 
-		existingMetric, err := s.storage.GetMetric(ctx, input.ID)
-		if err != nil {
-			if errors.Is(err, repository.ErrMetricNotFound) {
-				return s.storage.SetMetric(ctx, input)
+		existingMetric, getErr := s.storage.GetMetric(ctx, input.ID)
+		if getErr != nil {
+			if errors.Is(getErr, repository.ErrMetricNotFound) {
+				err = s.storage.SetMetric(ctx, input)
+			} else {
+				err = fmt.Errorf("failed to get existing counter: %w", getErr)
 			}
-			return fmt.Errorf("failed to get existing counter: %w", err)
+		} else {
+			if existingMetric.Delta == nil {
+				return fmt.Errorf("existing counter has nil delta")
+			}
+			newDelta := *existingMetric.Delta + *input.Delta
+			input.Delta = &newDelta
+			err = s.storage.SetMetric(ctx, input)
 		}
-
-		if existingMetric.Delta == nil {
-			return fmt.Errorf("existing counter has nil delta")
-		}
-		newDelta := *existingMetric.Delta + *input.Delta
-		input.Delta = &newDelta
-		return s.storage.SetMetric(ctx, input)
 
 	case models.Gauge:
 		if input.Value == nil {
 			return fmt.Errorf("value is required for gauge metric")
 		}
-		return s.storage.SetMetric(ctx, input)
+		err = s.storage.SetMetric(ctx, input)
 
 	default:
-		return fmt.Errorf("unsupported metric type: %s", input.MType)
+		err = fmt.Errorf("unsupported metric type: %s", input.MType)
 	}
+
+	if err == nil {
+		s.auditOperation(ctx, input.ID, ipAddress)
+	}
+
+	return err
 }
 
 func (s *MetricsService) SaveToFile(ctx context.Context) error {
@@ -159,8 +182,8 @@ func (s *MetricsService) LoadMetrics(ctx context.Context) error {
 	return nil
 }
 
-func (s *MetricsService) SetMetricWithSync(ctx context.Context, model models.Metrics) error {
-	if err := s.SetNewMetric(ctx, model); err != nil {
+func (s *MetricsService) SetMetricWithSync(ctx context.Context, model models.Metrics, ipAddress string) error {
+	if err := s.SetNewMetric(ctx, model, ipAddress); err != nil {
 		return err
 	}
 
@@ -170,11 +193,26 @@ func (s *MetricsService) SetMetricWithSync(ctx context.Context, model models.Met
 	return nil
 }
 
-func (s *MetricsService) UpdateBatch(ctx context.Context, metrics []models.Metrics) error {
+func (s *MetricsService) UpdateBatch(ctx context.Context, metrics []models.Metrics, ipAddress string) error {
 	for _, m := range metrics {
-		if err := s.SetNewMetric(ctx, m); err != nil {
+		if err := s.SetNewMetric(ctx, m, ipAddress); err != nil {
 			return err
 		}
 	}
+
+	if s.observer != nil && ipAddress != "" {
+		metricNames := make([]string, len(metrics))
+		for i, m := range metrics {
+			metricNames[i] = m.ID
+		}
+		s.observer.Notify(ctx, metricNames, ipAddress)
+	}
+
 	return nil
+}
+
+func (s *MetricsService) auditOperation(ctx context.Context, metricName string, ipAddress string) {
+	if s.observer != nil && ipAddress != "" {
+		s.observer.Notify(ctx, []string{metricName}, ipAddress)
+	}
 }

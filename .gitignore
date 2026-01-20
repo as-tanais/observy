@@ -31,3 +31,6 @@ metrics-backup.json
 # ENV
 
 .env
+
+# temp
+/temp
