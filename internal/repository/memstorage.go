@@ -18,11 +18,11 @@ func NewMemStorage() Storage {
 	}
 }
 
-func (s *MemStorage) SetMetric(_ context.Context, m models.Metrics) error {
+func (s *MemStorage) SetMetric(_ context.Context, m *models.Metrics) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.metrics[m.ID] = m
+	s.metrics[m.ID] = *m
 
 	return nil
 }

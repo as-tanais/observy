@@ -20,7 +20,7 @@ func NewPGStorage(db *pgxpool.Pool) Storage {
 	return &PGStorage{db: db}
 }
 
-func (r *PGStorage) SetMetric(ctx context.Context, m models.Metrics) error {
+func (r *PGStorage) SetMetric(ctx context.Context, m *models.Metrics) error {
 
 	return retry.WithBackoff(func() error {
 		_, err := r.db.Exec(ctx,

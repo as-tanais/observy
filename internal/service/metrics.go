@@ -87,7 +87,7 @@ func (s *MetricsService) setCounterMetric(ctx context.Context, metric *models.Me
 		if errors.Is(err, repository.ErrMetricNotFound) {
 			newDelta := v
 			metric.Delta = &newDelta
-			return s.storage.SetMetric(ctx, *metric)
+			return s.storage.SetMetric(ctx, metric)
 		}
 		return fmt.Errorf("failed to get existing counter: %w", err)
 	}
@@ -97,7 +97,7 @@ func (s *MetricsService) setCounterMetric(ctx context.Context, metric *models.Me
 	}
 	newDelta := *existingMetric.Delta + v
 	metric.Delta = &newDelta
-	return s.storage.SetMetric(ctx, *metric)
+	return s.storage.SetMetric(ctx, metric)
 }
 
 func (s *MetricsService) setGaugeMetric(ctx context.Context, metric *models.Metrics, valueStr string) error {
@@ -106,7 +106,7 @@ func (s *MetricsService) setGaugeMetric(ctx context.Context, metric *models.Metr
 		return fmt.Errorf("invalid gauge value '%s': %w", valueStr, err)
 	}
 	metric.Value = &v
-	return s.storage.SetMetric(ctx, *metric)
+	return s.storage.SetMetric(ctx, metric)
 }
 
 func (s *MetricsService) GetAllMetrics(ctx context.Context) ([]models.Metrics, error) {
@@ -128,7 +128,7 @@ func (s *MetricsService) SetNewMetric(ctx context.Context, input models.Metrics,
 		existingMetric, getErr := s.storage.GetMetric(ctx, input.ID)
 		if getErr != nil {
 			if errors.Is(getErr, repository.ErrMetricNotFound) {
-				err = s.storage.SetMetric(ctx, input)
+				err = s.storage.SetMetric(ctx, &input)
 			} else {
 				err = fmt.Errorf("failed to get existing counter: %w", getErr)
 			}
@@ -138,14 +138,14 @@ func (s *MetricsService) SetNewMetric(ctx context.Context, input models.Metrics,
 			}
 			newDelta := *existingMetric.Delta + *input.Delta
 			input.Delta = &newDelta
-			err = s.storage.SetMetric(ctx, input)
+			err = s.storage.SetMetric(ctx, &input)
 		}
 
 	case models.Gauge:
 		if input.Value == nil {
 			return fmt.Errorf("value is required for gauge metric")
 		}
-		err = s.storage.SetMetric(ctx, input)
+		err = s.storage.SetMetric(ctx, &input)
 
 	default:
 		err = fmt.Errorf("unsupported metric type: %s", input.MType)
@@ -174,7 +174,7 @@ func (s *MetricsService) LoadMetrics(ctx context.Context) error {
 	}
 
 	for _, m := range metrics {
-		if err := s.storage.SetMetric(ctx, m); err != nil {
+		if err := s.storage.SetMetric(ctx, &m); err != nil {
 			return err
 		}
 	}

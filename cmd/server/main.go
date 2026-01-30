@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	_ "net/http/pprof"
 
 	"github.com/as-tanais/observy/internal/server"
 )
