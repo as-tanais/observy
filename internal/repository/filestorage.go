@@ -57,11 +57,11 @@ func (fs *FileStorage) LoadMetrics() ([]models.Metrics, error) {
 	return metrics, nil
 }
 
-func (fs *FileStorage) SetMetric(_ context.Context, m models.Metrics) error {
+func (fs *FileStorage) SetMetric(_ context.Context, m *models.Metrics) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	fs.metrics[m.ID] = m
+	fs.metrics[m.ID] = *m
 
 	return nil
 }

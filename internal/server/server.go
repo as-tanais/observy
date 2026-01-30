@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -141,6 +142,35 @@ func Run() error {
 		log.Info("Server is ready", zap.String("listening on", cfg.Address))
 		log.Info("Server use", zap.String("storage", usedStorage))
 		serverErr <- server.ListenAndServe()
+	}()
+
+	//делаем отдельный сервер для pprof чтобы не переписывать мидлварю
+
+	go func() {
+		debugRouter := chi.NewRouter()
+
+		debugRouter.HandleFunc("/debug/pprof/", pprof.Index)
+		debugRouter.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		debugRouter.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		debugRouter.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		debugRouter.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+		debugRouter.Mount("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+		debugRouter.Mount("/debug/pprof/heap", pprof.Handler("heap"))
+		debugRouter.Mount("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+		debugRouter.Mount("/debug/pprof/block", pprof.Handler("block"))
+		debugRouter.Mount("/debug/pprof/mutex", pprof.Handler("mutex"))
+		debugRouter.Mount("/debug/pprof/allocs", pprof.Handler("allocs"))
+
+		debugServer := &http.Server{
+			Addr:    "localhost:6060", // или другой порт
+			Handler: debugRouter,
+		}
+
+		log.Info("Debug server started", zap.String("port", "6060"))
+		if err := debugServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("Debug server failed", zap.Error(err))
+		}
 	}()
 
 	shutdown := make(chan os.Signal, 1)

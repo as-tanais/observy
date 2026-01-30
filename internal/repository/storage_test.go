@@ -54,7 +54,7 @@ func TestPGStorage_SetAndGetGauge(t *testing.T) {
 		Value: ptrFloat64(123.45),
 	}
 
-	err := storage.SetMetric(ctx, metric)
+	err := storage.SetMetric(ctx, &metric)
 	require.NoError(t, err)
 
 	result, err := storage.GetMetric(ctx, "Alloc")
@@ -79,7 +79,7 @@ func TestPGStorage_SetAndGetCounter(t *testing.T) {
 		Delta: ptrInt64(10),
 	}
 
-	err := storage.SetMetric(ctx, metric)
+	err := storage.SetMetric(ctx, &metric)
 	require.NoError(t, err)
 
 	result, err := storage.GetMetric(ctx, "PollCount")
@@ -117,7 +117,7 @@ func TestPGStorage_CounterAccumulation(t *testing.T) {
 		MType: models.Counter,
 		Delta: ptrInt64(5),
 	}
-	err := storage.SetMetric(ctx, metric1)
+	err := storage.SetMetric(ctx, &metric1)
 	require.NoError(t, err)
 
 	metric2 := models.Metrics{
@@ -125,7 +125,7 @@ func TestPGStorage_CounterAccumulation(t *testing.T) {
 		MType: models.Counter,
 		Delta: ptrInt64(3),
 	}
-	err = storage.SetMetric(ctx, metric2)
+	err = storage.SetMetric(ctx, &metric2)
 	require.NoError(t, err)
 
 	result, err := storage.GetMetric(ctx, "Counter")
@@ -149,7 +149,7 @@ func TestPGStorage_GaugeOverwrite(t *testing.T) {
 		MType: models.Gauge,
 		Value: ptrFloat64(100),
 	}
-	err := storage.SetMetric(ctx, metric1)
+	err := storage.SetMetric(ctx, &metric1)
 	require.NoError(t, err)
 
 	metric2 := models.Metrics{
@@ -157,7 +157,7 @@ func TestPGStorage_GaugeOverwrite(t *testing.T) {
 		MType: models.Gauge,
 		Value: ptrFloat64(200),
 	}
-	err = storage.SetMetric(ctx, metric2)
+	err = storage.SetMetric(ctx, &metric2)
 	require.NoError(t, err)
 
 	result, err := storage.GetMetric(ctx, "Gauge")
@@ -194,7 +194,7 @@ func TestPGStorage_GetAll(t *testing.T) {
 	}
 
 	for _, m := range metricsToAdd {
-		err := storage.SetMetric(ctx, m)
+		err := storage.SetMetric(ctx, &m)
 		require.NoError(t, err)
 	}
 
@@ -243,7 +243,7 @@ func TestPGStorage_WithHash(t *testing.T) {
 		Hash:  "somehash123",
 	}
 
-	err := storage.SetMetric(ctx, metric)
+	err := storage.SetMetric(ctx, &metric)
 	require.NoError(t, err)
 
 	result, err := storage.GetMetric(ctx, "WithHash")
@@ -266,7 +266,7 @@ func TestPGStorage_MultipleMetricsUpdate(t *testing.T) {
 	}
 
 	for _, m := range metrics {
-		err := storage.SetMetric(ctx, m)
+		err := storage.SetMetric(ctx, &m)
 		require.NoError(t, err)
 	}
 
@@ -275,7 +275,7 @@ func TestPGStorage_MultipleMetricsUpdate(t *testing.T) {
 		MType: models.Gauge,
 		Value: ptrFloat64(10.0),
 	}
-	err := storage.SetMetric(ctx, updated)
+	err := storage.SetMetric(ctx, &updated)
 	require.NoError(t, err)
 
 	m1, err := storage.GetMetric(ctx, "Metric1")

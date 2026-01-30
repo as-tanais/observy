@@ -34,3 +34,6 @@ metrics-backup.json
 
 # temp
 /temp
+
+profiles/
+*.pprof
