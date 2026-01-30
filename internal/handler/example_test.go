@@ -2,6 +2,7 @@
 package handler_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -42,4 +43,34 @@ func ExampleMetricsHandler_UpdateMetricHandler() {
 	// Output:
 	// Status code: 200
 	// Response body: Metric updated: type=counter, name=test_counter, value=42
+}
+
+func ExampleMetricsHandler_ListMetricsHandler() {
+
+	storage := repository.NewMemStorage()
+	svc := service.NewMetricsService(storage, nil, 0, nil)
+	h := handler.NewMetricsHandler(svc)
+
+	_ = svc.SetMetric(context.Background(), "counter", "orders_total", "150", "127.0.0.1")
+	_ = svc.SetMetric(context.Background(), "gauge", "cpu_usage", "42.5", "127.0.0.1")
+	_ = svc.SetMetric(context.Background(), "counter", "requests_total", "1000", "127.0.0.1")
+
+	r := chi.NewRouter()
+	r.Get("/", h.ListMetricsHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	fmt.Println("Status code:", w.Code)
+	fmt.Println("Content-Type:", w.Header().Get("Content-Type"))
+	fmt.Println("Has metrics table:", w.Body.String() != "")
+	fmt.Println("Total metrics in response:", w.Body.String() != "")
+
+	// Output:
+	// Status code: 200
+	// Content-Type: text/html; charset=utf-8
+	// Has metrics table: true
+	// Total metrics in response: true
 }
