@@ -9,22 +9,60 @@ import (
 	"time"
 )
 
+// ServerConfig содержит конфигурацию сервера метрик
+// Значение получаются из переменных окружения(ПРИОРИТЕТ) или флагов командной строки
 type ServerConfig struct {
-	Address         string
-	LogLevel        string
-	StoreInterval   time.Duration
+	// Address - адрес и порт для запуска сервера
+	// default : "localhost:8080"
+	Address string
+
+	// LogLevel — уровень логирования (info, debub ...)
+	// default : "info".
+	LogLevel string
+
+	// StoreInterval — интервал автосохранения метрик в файл (в секундах).
+	// Значение 0 означает синхронное сохранение после каждой операции.
+	// default: 300 секунд.
+	StoreInterval time.Duration
+
+	// FileStoragePath — путь к файлу для персистентного хранения метрик.
+	// default: "./metrics-backup.json" в рабочей директории.
 	FileStoragePath string
-	Restore         bool
-	Key             string
+
+	// Restore — флаг восстановления метрик из файла при старте приложения.
+	// Если true — метрики загружаются из файла, указанного в FileStoragePath.
+	Restore bool
+
+	// Key — секретный ключ для подписи запросов между сервером и агентом(и).
+	// Если нет то проверки нет
+	Key string
 	DBConfig
+
+	// AuditFile — путь к файлу для записи аудит-логов операций с метриками.
+	// Если пустой — файловый аудит отключён.
 	AuditFile string
-	AuditURL  string
+
+	// AuditURL — URL для отправки аудит-логов по HTTP
+	// Если пустой — HTTP-аудит отключён.
+	AuditURL string
 }
 
+// DBConfig содержит параметры подключения к базе данных PostgreSQL.
 type DBConfig struct {
+
+	// DSN : "postgresql://user:password@host:port/dbname?sslmode=disable"
 	DSN string
 }
 
+// NewServerConfig создает новый ServerConfig
+// Возращает указатель на конфиг или ошибку если не удалось получить обязательные параметры
+// Пример использования:
+//
+//	cfg, err := config.NewServerConfig()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println("Server will start on", cfg.Address)
 func NewServerConfig() (*ServerConfig, error) {
 	cfg := &ServerConfig{}
 
@@ -81,6 +119,13 @@ func NewServerConfig() (*ServerConfig, error) {
 	return cfg, nil
 }
 
+// Validate проверяет корректность конфигурации.
+//
+// Возвращает ошибку, если:
+//   - адрес сервера пустой
+//   - другие критические параметры имеют недопустимые значения
+//
+// Используется автоматически в NewServerConfig после загрузки параметров.
 func (c *ServerConfig) Validate() error {
 	if c.Address == "" {
 		return fmt.Errorf("server address cannot be empty")
