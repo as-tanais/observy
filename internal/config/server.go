@@ -11,6 +11,7 @@ import (
 
 // ServerConfig содержит конфигурацию сервера метрик
 // Значение получаются из переменных окружения(ПРИОРИТЕТ) или флагов командной строки
+// generate:reset
 type ServerConfig struct {
 	// Address - адрес и порт для запуска сервера
 	// default : "localhost:8080"
