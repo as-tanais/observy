@@ -11,9 +11,14 @@ import (
 	"time"
 
 	"github.com/as-tanais/observy/internal/agent"
+	"github.com/as-tanais/observy/internal/buildinfo"
 	"github.com/as-tanais/observy/internal/config"
 	models "github.com/as-tanais/observy/internal/model"
 )
+
+var buildVersion string
+var buildDate string
+var buildCommit string
 
 func worker(jobs <-chan []models.Metrics, address, key string, wg *sync.WaitGroup, reportInterval time.Duration) {
 	defer wg.Done()
@@ -25,6 +30,8 @@ func worker(jobs <-chan []models.Metrics, address, key string, wg *sync.WaitGrou
 }
 
 func main() {
+	buildinfo.PrintInfo(buildVersion, buildDate, buildCommit)
+
 	cfg, err := config.NewAgentConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
