@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
@@ -15,34 +14,24 @@ import (
 )
 
 func ExampleMetricsHandler_UpdateMetricHandler() {
-	// 1. Создаём тестовое хранилище и сервис
-	storage := repository.NewMemStorage()
+
+	storage := repository.NewFileStorage("/var/metrics.db")
 	svc := service.NewMetricsService(storage, nil, 0, nil)
 	h := handler.NewMetricsHandler(svc)
 
-	// 2. Настраиваем роутер с нужным эндпоинтом
 	r := chi.NewRouter()
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetricHandler)
 
-	// 3. Создаём тестовый запрос к эндпоинту
-	// Обновляем counter-метрику "test_counter" со значением 42
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/update/counter/test_counter/42",
-		strings.NewReader(""),
-	)
-	w := httptest.NewRecorder()
+	http.ListenAndServe(":8080", r)
 
-	// 4. Выполняем запрос через роутер
-	r.ServeHTTP(w, req)
-
-	// 5. Выводим результат для документации
-	fmt.Println("Status code:", w.Code)
-	fmt.Println("Response body:", w.Body.String())
+	// проверка:
+	// $ curl -X POST http://localhost:8080/update/counter/orders_total/1
+	// $ curl -X POST http://localhost:8080/update/gauge/cpu_usage/42.5
+	// $ curl -X POST http://localhost:8080/update/counter/errors_total/1
 
 	// Output:
-	// Status code: 200
-	// Response body: Metric updated: type=counter, name=test_counter, value=42
+	// Server listening on :8080
+	// Metrics endpoint: POST /update/{type}/{name}/{value}
 }
 
 func ExampleMetricsHandler_ListMetricsHandler() {

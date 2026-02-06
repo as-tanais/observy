@@ -17,7 +17,7 @@ type ServerConfig struct {
 	// default : "localhost:8080"
 	Address string
 
-	// LogLevel — уровень логирования (info, debub ...)
+	// LogLevel — уровень логирования (info, debug ...)
 	// default : "info".
 	LogLevel string
 
