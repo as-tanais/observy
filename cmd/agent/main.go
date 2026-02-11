@@ -16,9 +16,11 @@ import (
 	models "github.com/as-tanais/observy/internal/model"
 )
 
-var buildVersion string
-var buildDate string
-var buildCommit string
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
 
 func worker(jobs <-chan []models.Metrics, address, key string, wg *sync.WaitGroup, reportInterval time.Duration) {
 	defer wg.Done()

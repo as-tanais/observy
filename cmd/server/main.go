@@ -8,9 +8,11 @@ import (
 	"github.com/as-tanais/observy/internal/server"
 )
 
-var buildVersion string
-var buildDate string
-var buildCommit string
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
 
 func main() {
 
