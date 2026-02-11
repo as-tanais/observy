@@ -17,7 +17,7 @@ type AgentConfig struct {
 	// default: 2 секунд.
 	PollInterval time.Duration
 
-	// PollInterval — интервал отправки метрик на сервер (в секундах).
+	// ReportInterval — интервал отправки метрик на сервер (в секундах).
 	// default: 2 секунд.
 	ReportInterval time.Duration
 

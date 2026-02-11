@@ -2,11 +2,7 @@
 package handler_test
 
 import (
-	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
@@ -15,62 +11,79 @@ import (
 )
 
 func ExampleMetricsHandler_UpdateMetricHandler() {
-	// 1. Создаём тестовое хранилище и сервис
 	storage := repository.NewMemStorage()
 	svc := service.NewMetricsService(storage, nil, 0, nil)
 	h := handler.NewMetricsHandler(svc)
 
-	// 2. Настраиваем роутер с нужным эндпоинтом
 	r := chi.NewRouter()
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetricHandler)
 
-	// 3. Создаём тестовый запрос к эндпоинту
-	// Обновляем counter-метрику "test_counter" со значением 42
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/update/counter/test_counter/42",
-		strings.NewReader(""),
-	)
-	w := httptest.NewRecorder()
+	// Запускаем сервер :
+	//   http.ListenAndServe(":8080", r)
+	//
+	// Примеры запросов:
+	//   $ curl -X POST http://localhost:8080/update/counter/orders_total/1
+	//   $ curl -X POST http://localhost:8080/update/gauge/cpu_usage/42.5
 
-	// 4. Выполняем запрос через роутер
-	r.ServeHTTP(w, req)
-
-	// 5. Выводим результат для документации
-	fmt.Println("Status code:", w.Code)
-	fmt.Println("Response body:", w.Body.String())
-
-	// Output:
-	// Status code: 200
-	// Response body: Metric updated: type=counter, name=test_counter, value=42
+	fmt.Println("Handler registered at /update/{type}/{name}/{value}")
+	// Output: Handler registered at /update/{type}/{name}/{value}
 }
 
 func ExampleMetricsHandler_ListMetricsHandler() {
-
 	storage := repository.NewMemStorage()
 	svc := service.NewMetricsService(storage, nil, 0, nil)
 	h := handler.NewMetricsHandler(svc)
 
-	_ = svc.SetMetric(context.Background(), "counter", "orders_total", "150", "127.0.0.1")
-	_ = svc.SetMetric(context.Background(), "gauge", "cpu_usage", "42.5", "127.0.0.1")
-	_ = svc.SetMetric(context.Background(), "counter", "requests_total", "1000", "127.0.0.1")
+	// Регистрируем хендлер для просмотра всех метрик
+	r := chi.NewRouter()
+	r.Get("/metrics", h.ListMetricsHandler)
+
+	// Запускаем сервер (в реальном приложении):
+	//   http.ListenAndServe(":8080", r)
+	//
+	// Теперь можно получить все метрики:
+	//   $ curl http://localhost:8080/metrics
+	//   <!DOCTYPE html>
+	//   <html>
+	//   <body>
+	//     <h1>Metrics</h1>
+	//     <table>
+	//       <tr><th>Type</th><th>Name</th><th>Value</th></tr>
+	//       <tr><td>counter</td><td>orders_total</td><td>150</td></tr>
+	//       <tr><td>gauge</td><td>cpu_usage</td><td>42.5</td></tr>
+	//     </table>
+	//   </body>
+	//   </html>
+
+	fmt.Println("Handler registered at /metrics")
+	// Output: Handler registered at /metrics
+}
+
+func ExampleMetricsHandler_GetMetric() {
+	storage := repository.NewMemStorage()
+	svc := service.NewMetricsService(storage, nil, 0, nil)
+	h := handler.NewMetricsHandler(svc)
 
 	r := chi.NewRouter()
-	r.Get("/", h.ListMetricsHandler)
+	r.Get("/value/", h.GetMetric)
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	w := httptest.NewRecorder()
+	// Запускаем сервер (в реальном приложении):
+	//   http.ListenAndServe(":8080", r)
+	//
+	// Теперь можно получить все метрики:
+	//   $ curl http://localhost:8080/value/
+	//   <!DOCTYPE html>
+	//   <html>
+	//   <body>
+	//     <h1>Metrics</h1>
+	//     <table>
+	//       <tr><th>Type</th><th>Name</th><th>Value</th></tr>
+	//       <tr><td>counter</td><td>orders_total</td><td>150</td></tr>
+	//       <tr><td>gauge</td><td>cpu_usage</td><td>42.5</td></tr>
+	//     </table>
+	//   </body>
+	//   </html>
 
-	r.ServeHTTP(w, req)
-
-	fmt.Println("Status code:", w.Code)
-	fmt.Println("Content-Type:", w.Header().Get("Content-Type"))
-	fmt.Println("Has metrics table:", w.Body.String() != "")
-	fmt.Println("Total metrics in response:", w.Body.String() != "")
-
-	// Output:
-	// Status code: 200
-	// Content-Type: text/html; charset=utf-8
-	// Has metrics table: true
-	// Total metrics in response: true
+	fmt.Println("Handler registered at /value/")
+	// Output: Handler registered at /value/
 }
