@@ -29,6 +29,7 @@ type AgentConfig struct {
 	// По умолчанию: 1.
 	// Минимальное значение: 1.
 	RateLimit int
+	CryptoKey string
 }
 
 // NewAgentConfig Возращает указатель на конфиг или ошибку если не удалось получить обязательные параметры
@@ -48,6 +49,8 @@ func NewAgentConfig() (*AgentConfig, error) {
 	reportFlag := flag.Int("r", 10, "Report interval in seconds")
 	keyFlag := flag.String("k", "", "Secret key for request singing")
 	limitFlag := flag.Int("l", 1, "Rate limit")
+
+	cryptoKeyFlag := flag.String("crypto-key", "", "path to private key file for decryption")
 
 	flag.Parse()
 
@@ -73,6 +76,8 @@ func NewAgentConfig() (*AgentConfig, error) {
 	}
 
 	cfg.RateLimit = rateLimit
+
+	cfg.CryptoKey = GetEnvOrDefault("CRYPTO_KEY", *cryptoKeyFlag)
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
