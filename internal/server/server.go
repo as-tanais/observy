@@ -110,11 +110,10 @@ func Run() error {
 	}
 
 	var privateKey *rsa.PrivateKey
-	if cfg.CryptoKeyPath != "" { // Используйте имя вашего поля из config.ServerConfig
+	if cfg.CryptoKeyPath != "" {
 		log.Info("Loading private key for decryption", zap.String("path", cfg.CryptoKeyPath))
-		key, err := crypto.LoadPrivateKey(cfg.CryptoKeyPath) // Вам понадобится такая функция
+		key, err := crypto.LoadPrivateKey(cfg.CryptoKeyPath)
 		if err != nil {
-			// Критическая ошибка? Если ключ передан, но не грузится - сервер не должен запускаться?
 			log.Fatal("Failed to load private key", zap.Error(err))
 		}
 		privateKey = key
@@ -193,7 +192,7 @@ func Run() error {
 	}()
 
 	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
 	var errServer error
 	select {
