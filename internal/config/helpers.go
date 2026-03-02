@@ -25,3 +25,13 @@ func GetEnvBoolOrDefault(key string, defaultValue bool) bool {
 	}
 	return defaultValue
 }
+
+func getConfigPath(flagValue, flagAliasValue string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	if flagAliasValue != "" {
+		return flagAliasValue
+	}
+	return os.Getenv("CONFIG")
+}

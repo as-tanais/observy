@@ -84,7 +84,19 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	cryptoKeyFlag := flag.String("crypto-key", "", "path to private key file for decryption")
 
+	configFlag := flag.String("c", "", "Path to JSON config file")
+	configFlagAlias := flag.String("config", "", "Path to JSON config file (alias for -c)")
+
 	flag.Parse()
+
+	configPath := getConfigPath(*configFlag, *configFlagAlias)
+	if configPath != "" {
+		jsonCfg, err := LoadFromJSON(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load JSON config: %w", err)
+		}
+		jsonCfg.ApplyToServerConfig(cfg)
+	}
 
 	cfg.Address = GetEnvOrDefault("ADDRESS", *addrFlag)
 	cfg.LogLevel = GetEnvOrDefault("LOG_LEVEL", *logFlag)
