@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/as-tanais/observy/internal/audit"
 	"github.com/as-tanais/observy/internal/config"
+	"github.com/as-tanais/observy/internal/crypto"
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
 	"github.com/as-tanais/observy/internal/service"
@@ -107,9 +109,26 @@ func Run() error {
 		}
 	}
 
+	var privateKey *rsa.PrivateKey
+	if cfg.CryptoKeyPath != "" { // Используйте имя вашего поля из config.ServerConfig
+		log.Info("Loading private key for decryption", zap.String("path", cfg.CryptoKeyPath))
+		key, err := crypto.LoadPrivateKey(cfg.CryptoKeyPath) // Вам понадобится такая функция
+		if err != nil {
+			// Критическая ошибка? Если ключ передан, но не грузится - сервер не должен запускаться?
+			log.Fatal("Failed to load private key", zap.Error(err))
+		}
+		privateKey = key
+		log.Info("Private key loaded successfully")
+	}
+
 	router := chi.NewRouter()
 	router.Use(middleware.WithLogging(log))
 	router.Use(middleware.GzipDecompressRequest())
+
+	if privateKey != nil {
+		router.Use(middleware.DecryptionMiddleware(privateKey))
+	}
+
 	if cfg.Key != "" {
 		router.Use(middleware.SignatureMiddleware(cfg.Key))
 	}

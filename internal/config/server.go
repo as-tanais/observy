@@ -46,6 +46,8 @@ type ServerConfig struct {
 	// AuditURL — URL для отправки аудит-логов по HTTP
 	// Если пустой — HTTP-аудит отключён.
 	AuditURL string
+	// CryptoKeyPath -путь к файлу с ключом для дешифрования данных
+	CryptoKeyPath string
 }
 
 // DBConfig содержит параметры подключения к базе данных PostgreSQL.
@@ -80,6 +82,8 @@ func NewServerConfig() (*ServerConfig, error) {
 	auditFileFlag := flag.String("audit-file", "", "file audit logs path")
 	auditURLFlag := flag.String("audit-url", "", "url audit logs address")
 
+	cryptoKeyFlag := flag.String("crypto-key", "", "path to private key file for decryption")
+
 	flag.Parse()
 
 	cfg.Address = GetEnvOrDefault("ADDRESS", *addrFlag)
@@ -112,6 +116,8 @@ func NewServerConfig() (*ServerConfig, error) {
 	}
 
 	cfg.Key = GetEnvOrDefault("KEY", *keyFlag)
+
+	cfg.CryptoKeyPath = GetEnvOrDefault("CRYPTO_KEY", *cryptoKeyFlag)
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err

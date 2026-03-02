@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/as-tanais/observy/internal/agent"
 	"github.com/as-tanais/observy/internal/buildinfo"
 	"github.com/as-tanais/observy/internal/config"
+	"github.com/as-tanais/observy/internal/crypto"
 	models "github.com/as-tanais/observy/internal/model"
 )
 
@@ -22,11 +24,11 @@ var (
 	buildCommit  string
 )
 
-func worker(jobs <-chan []models.Metrics, address, key string, wg *sync.WaitGroup, reportInterval time.Duration) {
+func worker(jobs <-chan []models.Metrics, address, key string, pubKey *rsa.PublicKey, wg *sync.WaitGroup, reportInterval time.Duration) {
 	defer wg.Done()
 	for m := range jobs {
-		agent.Send(m, address, key)
-		agent.SendBatchMetrics(m, address, key)
+		agent.Send(m, address, key, pubKey)
+		agent.SendBatchMetrics(m, address, key, pubKey)
 		time.Sleep(reportInterval)
 	}
 }
@@ -54,8 +56,18 @@ func main() {
 
 	wg.Add(totalGoR)
 
+	var publicKey *rsa.PublicKey
+	if cfg.CryptoKey != "" {
+		log.Printf("Loading public key from: %s", cfg.CryptoKey)
+		key, err := crypto.LoadPublicKey(cfg.CryptoKey)
+		if err != nil {
+			log.Fatalf("Failed to load public key: %v", err)
+		}
+		publicKey = key
+	}
+
 	for i := 0; i < cfg.RateLimit; i++ {
-		go worker(tasks, cfg.ServerURL(), cfg.Key, &wg, cfg.ReportInterval)
+		go worker(tasks, cfg.ServerURL(), cfg.Key, publicKey, &wg, cfg.ReportInterval)
 	}
 
 	go func() {
