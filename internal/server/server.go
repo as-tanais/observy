@@ -126,6 +126,8 @@ func Run() error {
 	router.Use(middleware.WithLogging(log))
 	router.Use(middleware.GzipDecompressRequest())
 
+	router.Use(middleware.TrustedSubnetMiddleware(cfg.GetTrustedSubnet(), log))
+
 	if privateKey != nil {
 		router.Use(middleware.DecryptionMiddleware(privateKey))
 	}
