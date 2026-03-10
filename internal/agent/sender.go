@@ -61,6 +61,7 @@ func sendMetric(metric models.Metrics, serverAddress string) error {
 	}
 
 	req.Header.Set("Content-Type", "text/plain")
+	addRealIPHeader(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -127,6 +128,8 @@ func sendMetricJSON(metric models.Metrics, serverAddress string, key string, pub
 		if hash != "" {
 			req.Header.Set("HashSHA256", hash)
 		}
+
+		addRealIPHeader(req)
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -221,6 +224,8 @@ func SendBatchMetrics(metrics []models.Metrics, serverAddress string, key string
 			req.Header.Set("HashSHA256", hash)
 		}
 
+		addRealIPHeader(req)
+
 		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("sending error: %w", err)
@@ -246,6 +251,8 @@ func newCompressedJSONRequest(method string, url string, data []byte) (*http.Req
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
+
+	addRealIPHeader(req)
 
 	return req, nil
 }

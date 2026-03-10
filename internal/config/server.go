@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -48,6 +49,10 @@ type ServerConfig struct {
 	AuditURL string
 	// CryptoKeyPath -путь к файлу с ключом для дешифрования данных
 	CryptoKeyPath string
+	// TrustedSubnet - подсети, которые считаются довереными
+	TrustedSubnet string `json:"trusted_subnet"`
+	// trustedSubnet - уже спарсенные CIDR для провеки подсетей
+	trustedSubnet *net.IPNet
 }
 
 // DBConfig содержит параметры подключения к базе данных PostgreSQL.
@@ -86,6 +91,8 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	configFlag := flag.String("c", "", "Path to JSON config file")
 	configFlagAlias := flag.String("config", "", "Path to JSON config file (alias for -c)")
+
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet in CIDR notation")
 
 	flag.Parse()
 
@@ -131,6 +138,18 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	cfg.CryptoKeyPath = GetEnvOrDefault("CRYPTO_KEY", *cryptoKeyFlag)
 
+	if envTrustedSubnet := os.Getenv("TRUSTED_SUBNET"); envTrustedSubnet != "" {
+		cfg.TrustedSubnet = envTrustedSubnet
+	}
+
+	if cfg.TrustedSubnet != "" {
+		_, ipNet, err := net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("invalid trusted subnet CIDR: %w", err)
+		}
+		cfg.trustedSubnet = ipNet
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -161,4 +180,8 @@ func getDefaultFilePath() string {
 	}
 
 	return filepath.Join(wd, "metrics-backup.json")
+}
+
+func (c *ServerConfig) GetTrustedSubnet() *net.IPNet {
+	return c.trustedSubnet
 }
