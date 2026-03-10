@@ -48,13 +48,11 @@ func (s *MetricsServer) UpdateMetrics(ctx context.Context, req *pb.UpdateMetrics
 		zap.Int("count", len(req.Metrics)))
 
 	metrics := make([]models.Metrics, 0, len(req.Metrics))
-	metricNames := make([]string, 0, len(req.Metrics))
 
 	for _, pbMetric := range req.Metrics {
 		metric := models.Metrics{
 			ID: pbMetric.Id,
 		}
-		metricNames = append(metricNames, pbMetric.Id)
 
 		switch pbMetric.Type {
 		case pb.Metric_GAUGE:
