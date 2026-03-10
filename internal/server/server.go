@@ -47,18 +47,20 @@ func Run() error {
 
 	if cfg.DSN != "" {
 		if err := dbMigrate(cfg.DSN); err != nil {
-			log.Fatal("Migration failed", zap.Error(err))
+			return fmt.Errorf("migration failed: %w", err)
 		}
 
 		dbConfig, err := pg.NewPoolConfig(cfg.DSN)
 		if err != nil {
-			log.Fatal("Parse DB config failed", zap.Error(err))
+			return fmt.Errorf("parse DB config failed: %w", err)
 		}
 
 		pool, err = pg.NewConnection(ctx, dbConfig)
 		if err != nil {
-			log.Fatal("DB connection failed", zap.Error(err))
+			return fmt.Errorf("DB connection failed: %w", err)
 		}
+
+		defer pool.Close()
 
 		storage = repository.NewPGStorage(pool)
 		usedStorage = "Postgres DB"
@@ -114,7 +116,7 @@ func Run() error {
 		log.Info("Loading private key for decryption", zap.String("path", cfg.CryptoKeyPath))
 		key, err := crypto.LoadPrivateKey(cfg.CryptoKeyPath)
 		if err != nil {
-			log.Fatal("Failed to load private key", zap.Error(err))
+			return fmt.Errorf("failed to load private key: %w", err)
 		}
 		privateKey = key
 		log.Info("Private key loaded successfully")
@@ -162,8 +164,6 @@ func Run() error {
 		serverErr <- server.ListenAndServe()
 	}()
 
-	//делаем отдельный сервер для pprof чтобы не переписывать мидлварю
-
 	go func() {
 		debugRouter := chi.NewRouter()
 
@@ -181,7 +181,7 @@ func Run() error {
 		debugRouter.Mount("/debug/pprof/allocs", pprof.Handler("allocs"))
 
 		debugServer := &http.Server{
-			Addr:    "localhost:6060", // или другой порт
+			Addr:    "localhost:6060",
 			Handler: debugRouter,
 		}
 
