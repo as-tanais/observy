@@ -41,7 +41,7 @@ func (s *MetricsServer) UpdateMetrics(ctx context.Context, req *pb.UpdateMetrics
 		return &pb.UpdateMetricsResponse{}, nil
 	}
 
-	auditIP, _ := ctx.Value("audit_ip").(string)
+	auditIP, _ := ctx.Value(AuditIPKey).(string)
 
 	s.logger.Debug("Processing gRPC metrics request",
 		zap.String("audit_ip", auditIP),

@@ -20,7 +20,7 @@ func IPInterceptor(trustedSubnet *net.IPNet, log *zap.Logger) grpc.UnaryServerIn
 			ip := extractIPFromMetadata(ctx, log)
 			if ip != "" {
 
-				ctx = context.WithValue(ctx, "audit_ip", ip)
+				ctx = context.WithValue(ctx, AuditIPKey, ip)
 				log.Debug("IP saved for audit", zap.String("ip", ip))
 			}
 			return handler(ctx, req)
@@ -48,7 +48,7 @@ func IPInterceptor(trustedSubnet *net.IPNet, log *zap.Logger) grpc.UnaryServerIn
 			return nil, status.Errorf(codes.PermissionDenied, "IP not in trusted subnet")
 		}
 
-		ctx = context.WithValue(ctx, "audit_ip", realIP)
+		ctx = context.WithValue(ctx, AuditIPKey, realIP)
 		log.Debug("IP verified and saved for audit", zap.String("ip", realIP))
 
 		return handler(ctx, req)
