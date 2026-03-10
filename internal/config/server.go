@@ -53,13 +53,15 @@ type ServerConfig struct {
 	TrustedSubnet string `json:"trusted_subnet"`
 	// trustedSubnet - уже спарсенные CIDR для провеки подсетей
 	trustedSubnet *net.IPNet
+	// GRPCAddress - адрес для GRPC сервера
+	GRPCAddress string `json:"grpc_address"`
 }
 
 // DBConfig содержит параметры подключения к базе данных PostgreSQL.
 type DBConfig struct {
 
 	// DSN : "postgresql://user:password@host:port/dbname?sslmode=disable"
-	DSN string
+	DSN string `json:"dsn"`
 }
 
 // NewServerConfig создает новый ServerConfig
@@ -74,7 +76,12 @@ type DBConfig struct {
 func NewServerConfig() (*ServerConfig, error) {
 	cfg := &ServerConfig{}
 
+	// Флаги командной строки
 	addrFlag := flag.String("a", "localhost:8080", "Server address host:port")
+
+	// Исправляем: используем StringVar для grpcAddress
+	grpcAddrFlag := flag.String("g", ":50051", "gRPC server address")
+
 	logFlag := flag.String("l", "info", "Log level (debug, info, warn, error)")
 	dbFlag := flag.String("d", "", "Database dsn")
 
@@ -89,13 +96,14 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	cryptoKeyFlag := flag.String("crypto-key", "", "path to private key file for decryption")
 
+	trustedSubnetFlag := flag.String("t", "", "trusted subnet in CIDR notation")
+
 	configFlag := flag.String("c", "", "Path to JSON config file")
 	configFlagAlias := flag.String("config", "", "Path to JSON config file (alias for -c)")
 
-	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet in CIDR notation")
-
 	flag.Parse()
 
+	// Загрузка из JSON файла если указан
 	configPath := getConfigPath(*configFlag, *configFlagAlias)
 	if configPath != "" {
 		jsonCfg, err := LoadFromJSON(configPath)
@@ -105,13 +113,19 @@ func NewServerConfig() (*ServerConfig, error) {
 		jsonCfg.ApplyToServerConfig(cfg)
 	}
 
+	// Переопределение из переменных окружения (приоритет)
 	cfg.Address = GetEnvOrDefault("ADDRESS", *addrFlag)
+
+	// Исправляем: получаем GRPCAddress из окружения или флага
+	cfg.GRPCAddress = GetEnvOrDefault("GRPC_ADDRESS", *grpcAddrFlag)
+
 	cfg.LogLevel = GetEnvOrDefault("LOG_LEVEL", *logFlag)
 	cfg.DSN = GetEnvOrDefault("DATABASE_DSN", *dbFlag)
 
 	cfg.AuditFile = GetEnvOrDefault("AUDIT_FILE", *auditFileFlag)
 	cfg.AuditURL = GetEnvOrDefault("AUDIT_URL", *auditURLFlag)
 
+	// StoreInterval
 	if envInterval := os.Getenv("STORE_INTERVAL"); envInterval != "" {
 		interval, err := strconv.Atoi(envInterval)
 		if err != nil {
@@ -124,6 +138,7 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	cfg.FileStoragePath = GetEnvOrDefault("FILE_STORAGE_PATH", *fileStoragePathFlag)
 
+	// Restore
 	if envRestore := os.Getenv("RESTORE"); envRestore != "" {
 		restore, err := strconv.ParseBool(envRestore)
 		if err != nil {
@@ -135,13 +150,16 @@ func NewServerConfig() (*ServerConfig, error) {
 	}
 
 	cfg.Key = GetEnvOrDefault("KEY", *keyFlag)
-
 	cfg.CryptoKeyPath = GetEnvOrDefault("CRYPTO_KEY", *cryptoKeyFlag)
 
+	// TrustedSubnet - сначала из флага, потом из окружения, потом из JSON
 	if envTrustedSubnet := os.Getenv("TRUSTED_SUBNET"); envTrustedSubnet != "" {
 		cfg.TrustedSubnet = envTrustedSubnet
+	} else if *trustedSubnetFlag != "" {
+		cfg.TrustedSubnet = *trustedSubnetFlag
 	}
 
+	// Парсим CIDR если указан
 	if cfg.TrustedSubnet != "" {
 		_, ipNet, err := net.ParseCIDR(cfg.TrustedSubnet)
 		if err != nil {

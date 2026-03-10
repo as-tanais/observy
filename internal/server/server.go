@@ -14,6 +14,7 @@ import (
 	"github.com/as-tanais/observy/internal/audit"
 	"github.com/as-tanais/observy/internal/config"
 	"github.com/as-tanais/observy/internal/crypto"
+	"github.com/as-tanais/observy/internal/grpc"
 	"github.com/as-tanais/observy/internal/handler"
 	"github.com/as-tanais/observy/internal/repository"
 	"github.com/as-tanais/observy/internal/service"
@@ -109,6 +110,29 @@ func Run() error {
 		if err := service.LoadMetrics(ctx); err != nil {
 			log.Warn("Failed to load metrics from file", zap.Error(err))
 		}
+	}
+
+	if cfg.GRPCAddress != "" {
+		grpcServer, grpcLis, err := grpc.StartGRPCServer(
+			cfg.GRPCAddress,
+			service,
+			cfg.GetTrustedSubnet(), // Передаем *net.IPNet
+			log,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to start gRPC server: %w", err)
+		}
+
+		go func() {
+			log.Info("gRPC server started", zap.String("addr", cfg.GRPCAddress))
+			if err := grpcServer.Serve(grpcLis); err != nil {
+				log.Error("gRPC server failed", zap.Error(err))
+			}
+		}()
+
+		defer grpcServer.GracefulStop()
+	} else {
+		log.Info("gRPC server not started (no address configured)")
 	}
 
 	var privateKey *rsa.PrivateKey
