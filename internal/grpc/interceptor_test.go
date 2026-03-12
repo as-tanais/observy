@@ -26,7 +26,7 @@ func TestIPInterceptor_NoSubnet(t *testing.T) {
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		// Проверяем, что IP сохранился в контексте
-		ip, ok := ctx.Value("audit_ip").(string)
+		ip, ok := ctx.Value(AuditIPKey).(string)
 		assert.True(t, ok, "audit_ip should be in context")
 		assert.Equal(t, "192.168.1.100", ip)
 		return "response", nil
@@ -49,7 +49,7 @@ func TestIPInterceptor_WithSubnet_ValidIP(t *testing.T) {
 	ctx = metadata.NewIncomingContext(ctx, md)
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		ip, ok := ctx.Value("audit_ip").(string)
+		ip, ok := ctx.Value(AuditIPKey).(string)
 		assert.True(t, ok)
 		assert.Equal(t, "192.168.1.100", ip)
 		return "response", nil
@@ -113,7 +113,7 @@ func TestIPInterceptor_WithPort(t *testing.T) {
 	ctx = metadata.NewIncomingContext(ctx, md)
 
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		ip, ok := ctx.Value("audit_ip").(string)
+		ip, ok := ctx.Value(AuditIPKey).(string)
 		assert.True(t, ok)
 		assert.Equal(t, "192.168.1.100", ip)
 		return "response", nil
