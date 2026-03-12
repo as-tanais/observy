@@ -24,11 +24,31 @@ var (
 	buildCommit  string
 )
 
-func worker(jobs <-chan []models.Metrics, address, key string, pubKey *rsa.PublicKey, wg *sync.WaitGroup, reportInterval time.Duration) {
+func worker(jobs <-chan []models.Metrics,
+	address, key string,
+	pubKey *rsa.PublicKey,
+	grpcClient *agent.GRPCClient,
+	wg *sync.WaitGroup,
+	reportInterval time.Duration) {
+
 	defer wg.Done()
+
 	for m := range jobs {
+
+		if grpcClient != nil {
+			ctx := context.Background()
+			if err := grpcClient.SendMetricsBatch(ctx, m); err == nil {
+
+				time.Sleep(reportInterval)
+				continue
+			} else {
+				log.Printf("gRPC send failed, falling back to HTTP: %v", err)
+			}
+		}
+
 		agent.Send(m, address, key, pubKey)
 		agent.SendBatchMetrics(m, address, key, pubKey)
+
 		time.Sleep(reportInterval)
 	}
 }
@@ -44,6 +64,21 @@ func main() {
 	fmt.Printf("Starting agent: server=%s, poll=%v, report=%v\n",
 		cfg.ServerURL(), cfg.PollInterval, cfg.ReportInterval)
 
+	var grpcClient *agent.GRPCClient
+	if cfg.GRPCAddress != "" {
+		log.Printf("Initializing gRPC client to %s", cfg.GRPCAddress)
+		grpcClient, err = agent.NewGRPCClient(cfg.GRPCAddress)
+		if err != nil {
+			log.Printf("Failed to create gRPC client go work with HTTP: %v", err)
+			grpcClient = nil
+		} else {
+
+			grpcClient = grpcClient.WithTimeout(15 * time.Second)
+			defer grpcClient.Close()
+			log.Println("gRPC client initialized successfully")
+		}
+	}
+
 	tasks := make(chan []models.Metrics, 100)
 
 	var wg sync.WaitGroup
@@ -53,7 +88,6 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	totalGoR := cfg.RateLimit + 3
-
 	wg.Add(totalGoR)
 
 	var publicKey *rsa.PublicKey
@@ -67,26 +101,21 @@ func main() {
 	}
 
 	for i := 0; i < cfg.RateLimit; i++ {
-		go worker(tasks, cfg.ServerURL(), cfg.Key, publicKey, &wg, cfg.ReportInterval)
+		go worker(tasks, cfg.ServerURL(), cfg.Key, publicKey, grpcClient, &wg, cfg.ReportInterval)
 	}
 
 	go func() {
-
 		defer wg.Done()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-
 				metrics := agent.Collect()
 				tasks <- metrics
-
 				time.Sleep(cfg.PollInterval)
-
 			}
 		}
-
 	}()
 
 	cpuDataChan := make(chan []float64, 1)
@@ -101,25 +130,33 @@ func main() {
 		for {
 			select {
 			case <-ctx.Done():
-
 				return
 			default:
-
 				metrics := agent.CollectSystemMetrics(cpuDataChan)
 				tasks <- metrics
-
 				time.Sleep(cfg.PollInterval)
-
 			}
-
 		}
-
 	}()
 
 	<-sigChan
+	log.Println("Shutting down agent")
 	cancel()
+	time.Sleep(1 * time.Second)
 	close(tasks)
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
 
+	select {
+	case <-done:
+		log.Println("All workers stoped")
+	case <-time.After(5 * time.Second):
+		log.Println("Wait workers")
+	}
+
+	log.Println("Agent stopped")
 }

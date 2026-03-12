@@ -28,8 +28,9 @@ type AgentConfig struct {
 	// RateLimit — ограничение количества одновременных запросов к серверу.
 	// По умолчанию: 1.
 	// Минимальное значение: 1.
-	RateLimit int
-	CryptoKey string
+	RateLimit   int
+	CryptoKey   string
+	GRPCAddress string
 }
 
 // NewAgentConfig Возращает указатель на конфиг или ошибку если не удалось получить обязательные параметры
@@ -54,6 +55,8 @@ func NewAgentConfig() (*AgentConfig, error) {
 
 	configFlag := flag.String("c", "", "Path to JSON config file")
 	configFlagAlias := flag.String("config", "", "Path to JSON config file (alias for -c)")
+
+	grpcAddrFlag := flag.String("grpc-addr", "", "gRPC server address (optional)")
 
 	flag.Parse()
 
@@ -90,6 +93,8 @@ func NewAgentConfig() (*AgentConfig, error) {
 	cfg.RateLimit = rateLimit
 
 	cfg.CryptoKey = GetEnvOrDefault("CRYPTO_KEY", *cryptoKeyFlag)
+
+	cfg.GRPCAddress = GetEnvOrDefault("GRPC_ADDRESS", *grpcAddrFlag)
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
