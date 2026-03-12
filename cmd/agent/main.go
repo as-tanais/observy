@@ -69,7 +69,7 @@ func main() {
 		log.Printf("Initializing gRPC client to %s", cfg.GRPCAddress)
 		grpcClient, err = agent.NewGRPCClient(cfg.GRPCAddress)
 		if err != nil {
-			log.Printf("Failed to create gRPC client (falling back to HTTP): %v", err)
+			log.Printf("Failed to create gRPC client go work with HTTP: %v", err)
 			grpcClient = nil
 		} else {
 
@@ -140,10 +140,23 @@ func main() {
 	}()
 
 	<-sigChan
-	log.Println("Shutting down...")
+	log.Println("Shutting down agent")
 	cancel()
+	time.Sleep(1 * time.Second)
 	close(tasks)
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("All workers stoped")
+	case <-time.After(5 * time.Second):
+		log.Println("Wait workers")
+	}
+
 	log.Println("Agent stopped")
 }

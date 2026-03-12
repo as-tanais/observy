@@ -25,10 +25,7 @@ type GRPCClient struct {
 
 // NewGRPCClient создает новый gRPC клиент
 func NewGRPCClient(serverAddr string) (*GRPCClient, error) {
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+	// Убираем контекст с таймаутом здесь - соединение будет в фоне
 	conn, err := grpc.NewClient(
 		serverAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -37,11 +34,10 @@ func NewGRPCClient(serverAddr string) (*GRPCClient, error) {
 		return nil, fmt.Errorf("failed to create gRPC client: %w", err)
 	}
 
-	if err := waitForConnection(ctx, conn); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("failed to connect to gRPC server: %w", err)
-	}
+	// НЕ ждем соединения здесь - пусть устанавливается в фоне
+	log.Printf("gRPC client created for %s (connecting in background)", serverAddr)
 
+	// Получаем локальный IP для заголовка
 	localIP := getLocalIP()
 	if localIP == "" {
 		log.Println("Warning: Could not determine local IP, x-real-ip header will be empty")
@@ -55,32 +51,8 @@ func NewGRPCClient(serverAddr string) (*GRPCClient, error) {
 		conn:    conn,
 		client:  client,
 		localIP: localIP,
-		timeout: 10 * time.Second,
+		timeout: 10 * time.Second, // Таймаут для запросов
 	}, nil
-}
-
-// waitForConnection ожидает готовности соединения
-func waitForConnection(ctx context.Context, conn *grpc.ClientConn) error {
-	for {
-		state := conn.GetState()
-		if state == connectivity.Ready {
-			return nil
-		}
-		if state == connectivity.Shutdown {
-			return fmt.Errorf("connection is shut down")
-		}
-
-		// Ждем изменения состояния или таймаута
-		if !conn.WaitForStateChange(ctx, state) {
-			return ctx.Err()
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-	}
 }
 
 // Close закрывает соединение
@@ -97,25 +69,54 @@ func (c *GRPCClient) SendMetrics(ctx context.Context, metrics []models.Metrics) 
 		return nil
 	}
 
+	// Проверяем состояние соединения
+	state := c.conn.GetState()
+	if state == connectivity.Shutdown {
+		return fmt.Errorf("connection is shut down")
+	}
+
+	// Если соединение не готово, пытаемся подождать немного
+	if state != connectivity.Ready {
+		log.Printf("Connection state: %s, waiting for ready...", state)
+
+		// Ждем готовности соединения (но не долго)
+		waitCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+
+		for state != connectivity.Ready {
+			if !c.conn.WaitForStateChange(waitCtx, state) {
+				// Таймаут ожидания - пробуем отправить, может работать
+				log.Printf("Timeout waiting for connection, attempting send anyway...")
+				break
+			}
+			state = c.conn.GetState()
+		}
+	}
+
+	// Конвертируем метрики в protobuf формат
 	pbMetrics, err := ToProtoMetrics(metrics)
 	if err != nil {
 		return fmt.Errorf("failed to convert metrics: %w", err)
 	}
 
+	// Создаем контекст с метаданными (IP агента)
 	md := metadata.New(map[string]string{
 		"x-real-ip": c.localIP,
 	})
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
+	// Создаем запрос
 	req := &pb.UpdateMetricsRequest{
 		Metrics: pbMetrics,
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	// Таймаут через контекст для конкретного запроса
+	callCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
+	// Отправляем запрос
 	start := time.Now()
-	resp, err := c.client.UpdateMetrics(ctx, req)
+	resp, err := c.client.UpdateMetrics(callCtx, req)
 	if err != nil {
 		return fmt.Errorf("gRPC call failed: %w", err)
 	}
@@ -127,21 +128,21 @@ func (c *GRPCClient) SendMetrics(ctx context.Context, metrics []models.Metrics) 
 	return nil
 }
 
-// SendMetricsBatch отправляет метрики
+// SendMetricsBatch отправляет метрики (аналог SendBatchMetrics для HTTP)
 func (c *GRPCClient) SendMetricsBatch(ctx context.Context, metrics []models.Metrics) error {
 	return c.SendMetrics(ctx, metrics)
+}
+
+// IsReady проверяет, готово ли соединение
+func (c *GRPCClient) IsReady() bool {
+	if c.conn == nil {
+		return false
+	}
+	return c.conn.GetState() == connectivity.Ready
 }
 
 // WithTimeout устанавливает таймаут для запросов
 func (c *GRPCClient) WithTimeout(timeout time.Duration) *GRPCClient {
 	c.timeout = timeout
 	return c
-}
-
-// IsConnected проверяет состояние соединения
-func (c *GRPCClient) IsConnected() bool {
-	if c.conn == nil {
-		return false
-	}
-	return c.conn.GetState() == connectivity.Ready
 }

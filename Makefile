@@ -19,3 +19,11 @@ result: $(PROFILE_DIR)
 .PHONY: compare
 compare: $(BASE_PROFILE) $(RESULT_PROFILE)
 	go tool pprof -top -diff_base=$(BASE_PROFILE) $(RESULT_PROFILE)
+
+# Запуск сервера с gRPC
+run-server-grpc:
+	go run cmd/server/*.go -a :8080 -g :50051
+
+# Запуск агента с gRPC
+run-agent-grpc:
+	go run cmd/agent/*.go -a localhost:8080 -grpc-addr localhost:50051 -p 2 -r 10
